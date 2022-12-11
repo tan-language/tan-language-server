@@ -1,12 +1,10 @@
 [package]
-name = "tan_lsp"
+name = "tan_lsp_server"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 lsp-types = "0.93"
 lsp-server = "0.6"
-
-[[bin]]
-name = "tan-lsp-server"
-path = "bin/tan_lsp_server/main.rs"
+clap = "4"
+tan_lsp = { path = "tan_lsp" }
