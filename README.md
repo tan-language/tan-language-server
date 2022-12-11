@@ -9,5 +9,7 @@ A server for LSP.
 
 - https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide
 
+- https://github.com/slint-ui/slint/tree/master/editors/vscode
+
 - https://crates.io/crates/lsp-types
 
