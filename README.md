@@ -12,4 +12,4 @@ A server for LSP.
 - https://github.com/slint-ui/slint/tree/master/editors/vscode
 
 - https://crates.io/crates/lsp-types
-
+- https://crates.io/crates/lsp-server
