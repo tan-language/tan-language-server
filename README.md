@@ -1,6 +1,7 @@
-# Tan Language Server Protocol
+# Tan LSP Server
 
-A server for LSP.
+The server exposes the Tan Analyzer through LSP (Language Server Protocol).
+This server is used by the `vscode_tan` extension.
 
 ## Links
 
