@@ -9,4 +9,4 @@ keywords = ["tan", "language", "lsp", "ide"]
 authors = ["George Moschovitis <gmosx@reizu.org>"]
 
 [dependencies]
-lsp-types = "0.93"
+lsp-types = "0.93.2"
