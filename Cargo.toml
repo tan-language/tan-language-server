@@ -10,7 +10,7 @@ authors = ["George Moschovitis <gmosx@reizu.org>"]
 
 [dependencies]
 anyhow = "1"
-lsp-types = "0.93"
+lsp-types = "=0.93.1"
 lsp-server = "0.6"
 clap = "4"
 tracing = "0.1"

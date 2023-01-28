@@ -1,0 +1,5 @@
+/home/gmosx/Base/Code/Language/tan_lsp_server/tan_lsp/target/debug/build/serde_derive-f5dbafeb400be61f/build_script_build-f5dbafeb400be61f: /home/gmosx/.cargo/registry/src/github.com-1ecc6299db9ec823/serde_derive-1.0.152/build.rs
+
+/home/gmosx/Base/Code/Language/tan_lsp_server/tan_lsp/target/debug/build/serde_derive-f5dbafeb400be61f/build_script_build-f5dbafeb400be61f.d: /home/gmosx/.cargo/registry/src/github.com-1ecc6299db9ec823/serde_derive-1.0.152/build.rs
+
+/home/gmosx/.cargo/registry/src/github.com-1ecc6299db9ec823/serde_derive-1.0.152/build.rs:
