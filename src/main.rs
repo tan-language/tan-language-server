@@ -1,16 +1,20 @@
-use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
+use lsp_server::{Connection, ExtractError, Message, RequestId, Response};
 use lsp_types::{
     notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
-    request::{GotoDefinition, References},
-    Diagnostic, DidChangeWatchedFilesParams, GotoDefinitionResponse, InitializeParams, OneOf,
-    PublishDiagnosticsParams, Range, ServerCapabilities,
+    request::{Formatting, GotoDefinition, References, Request},
+    Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, GotoDefinitionResponse,
+    InitializeParams, OneOf, Position, PublishDiagnosticsParams, Range, ServerCapabilities,
+    TextEdit,
 };
 use tan::api::parse_string;
+use tan_fmt::format_expr_compact;
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
 // #TODO remove this.
-fn cast<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
+fn cast<R>(
+    req: lsp_server::Request,
+) -> Result<(RequestId, R::Params), ExtractError<lsp_server::Request>>
 where
     R: lsp_types::request::Request,
     R::Params: serde::de::DeserializeOwned,
@@ -25,7 +29,6 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
         trace!("got msg: {:?}", msg);
         match msg {
             Message::Request(req) => {
-                // eprintln!("-- {}", req.method);
                 if connection.handle_shutdown(&req)? {
                     return Ok(());
                 }
@@ -62,7 +65,41 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                     Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
+
                 // ...
+
+                match req.method.as_ref() {
+                    Formatting::METHOD => {
+                        let (id, params) =
+                            req.extract::<DocumentFormattingParams>(Formatting::METHOD)?;
+
+                        let path = params.text_document.uri.path();
+                        let input = std::fs::read_to_string(path)?;
+                        let Ok(expr) = parse_string(&input) else {
+                            return Err(anyhow::anyhow!("Error"));
+                        };
+
+                        let formatted = format_expr_compact(&expr.0);
+
+                        // Select the whole document dore replacement
+                        let start = Position::new(0, 0);
+                        let end = Position::new(u32::MAX, u32::MAX);
+                        let document_range = Range::new(start, end);
+
+                        let result = Some(vec![TextEdit::new(document_range, formatted)]);
+                        let result = serde_json::to_value(&result).unwrap();
+                        let resp = Response {
+                            id,
+                            result: Some(result),
+                            error: None,
+                        };
+
+                        connection.sender.send(Message::Response(resp))?;
+
+                        continue;
+                    }
+                    _ => continue,
+                }
             }
             Message::Response(resp) => {
                 trace!("got response: {:?}", resp);
@@ -120,8 +157,6 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                         connection
                             .sender
                             .send(Message::Notification(notification))?;
-
-                        continue;
                     }
                 }
             }
@@ -144,6 +179,7 @@ fn main() -> anyhow::Result<()> {
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     })
     .unwrap();

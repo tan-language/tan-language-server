@@ -17,5 +17,6 @@ tracing = "0.1"
 tracing-subscriber = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tan_lsp = { path = "tan_lsp", version = "0.4" }
 tan = { path = "../tan", version = "0.4" }
+tan_fmt = { path = "../tan_fmt", version = "0.4" }
+tan_lsp = { path = "tan_lsp", version = "0.4" }

@@ -3,6 +3,12 @@
 The server exposes the Tan Analyzer through LSP (Language Server Protocol).
 This server is used by the `vscode_tan` extension.
 
+## Setup
+
+```sh
+cargo install tan_lsp_server
+```
+
 ## Status
 
 This is an experimental project, not intended for production use.
