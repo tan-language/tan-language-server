@@ -27,7 +27,7 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                 trace!("got request: {:?}", req);
                 match cast::<GotoDefinition>(req.clone()) {
                     Ok((id, params)) => {
-                        eprintln!("got gotoDefinition request #{}: {:?}", id, params);
+                        eprintln!("got gotoDefinition request #{id}: {params:?}");
                         let result = Some(GotoDefinitionResponse::Array(Vec::new()));
                         let result = serde_json::to_value(&result).unwrap();
                         let resp = Response {
@@ -38,12 +38,12 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                         connection.sender.send(Message::Response(resp))?;
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
                 match cast::<References>(req.clone()) {
                     Ok((id, params)) => {
-                        eprintln!("got references request #{}: {:?}", id, params);
+                        eprintln!("got references request #{id}: {params:?}");
                         let result = Some(Vec::<String>::new());
                         let result = serde_json::to_value(&result).unwrap();
                         let resp = Response {
@@ -54,7 +54,7 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                         connection.sender.send(Message::Response(resp))?;
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
                 // ...
