@@ -1,26 +1,25 @@
-use lsp_server::{Connection, ExtractError, Message, RequestId, Response};
+use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
-    request::{Formatting, GotoDefinition, References, Request},
-    Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, GotoDefinitionResponse,
-    InitializeParams, OneOf, Position, PublishDiagnosticsParams, Range, ServerCapabilities,
-    TextEdit,
+    request::{Formatting, Request},
+    Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, InitializeParams, OneOf,
+    Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
 };
 use tan::api::parse_string;
 use tan_fmt::format_expr_compact;
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
-// #TODO remove this.
-fn cast<R>(
-    req: lsp_server::Request,
-) -> Result<(RequestId, R::Params), ExtractError<lsp_server::Request>>
-where
-    R: lsp_types::request::Request,
-    R::Params: serde::de::DeserializeOwned,
-{
-    req.extract(R::METHOD)
-}
+// // #TODO remove this.
+// fn cast<R>(
+//     req: lsp_server::Request,
+// ) -> Result<(RequestId, R::Params), ExtractError<lsp_server::Request>>
+// where
+//     R: lsp_types::request::Request,
+//     R::Params: serde::de::DeserializeOwned,
+// {
+//     req.extract(R::METHOD)
+// }
 
 fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> {
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
@@ -33,40 +32,38 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                     return Ok(());
                 }
                 trace!("got request: {:?}", req);
-                match cast::<GotoDefinition>(req.clone()) {
-                    Ok((id, params)) => {
-                        eprintln!("got gotoDefinition request #{id}: {params:?}");
-                        let result = Some(GotoDefinitionResponse::Array(Vec::new()));
-                        let result = serde_json::to_value(&result).unwrap();
-                        let resp = Response {
-                            id,
-                            result: Some(result),
-                            error: None,
-                        };
-                        connection.sender.send(Message::Response(resp))?;
-                        continue;
-                    }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
-                    Err(ExtractError::MethodMismatch(req)) => req,
-                };
-                match cast::<References>(req.clone()) {
-                    Ok((id, params)) => {
-                        eprintln!("got references request #{id}: {params:?}");
-                        let result = Some(Vec::<String>::new());
-                        let result = serde_json::to_value(&result).unwrap();
-                        let resp = Response {
-                            id,
-                            result: Some(result),
-                            error: None,
-                        };
-                        connection.sender.send(Message::Response(resp))?;
-                        continue;
-                    }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
-                    Err(ExtractError::MethodMismatch(req)) => req,
-                };
-
-                // ...
+                // match cast::<GotoDefinition>(req.clone()) {
+                //     Ok((id, params)) => {
+                //         eprintln!("got gotoDefinition request #{id}: {params:?}");
+                //         let result = Some(GotoDefinitionResponse::Array(Vec::new()));
+                //         let result = serde_json::to_value(&result).unwrap();
+                //         let resp = Response {
+                //             id,
+                //             result: Some(result),
+                //             error: None,
+                //         };
+                //         connection.sender.send(Message::Response(resp))?;
+                //         continue;
+                //     }
+                //     Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                //     Err(ExtractError::MethodMismatch(req)) => req,
+                // };
+                // match cast::<References>(req.clone()) {
+                //     Ok((id, params)) => {
+                //         eprintln!("got references request #{id}: {params:?}");
+                //         let result = Some(Vec::<String>::new());
+                //         let result = serde_json::to_value(&result).unwrap();
+                //         let resp = Response {
+                //             id,
+                //             result: Some(result),
+                //             error: None,
+                //         };
+                //         connection.sender.send(Message::Response(resp))?;
+                //         continue;
+                //     }
+                //     Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                //     Err(ExtractError::MethodMismatch(req)) => req,
+                // };
 
                 match req.method.as_ref() {
                     Formatting::METHOD => {
@@ -177,8 +174,8 @@ fn main() -> anyhow::Result<()> {
     let (connection, io_threads) = Connection::stdio();
 
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
-        definition_provider: Some(OneOf::Left(true)),
-        references_provider: Some(OneOf::Left(true)),
+        // definition_provider: Some(OneOf::Left(true)),
+        // references_provider: Some(OneOf::Left(true)),
         document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     })
