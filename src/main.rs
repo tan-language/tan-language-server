@@ -78,11 +78,9 @@ fn main() -> anyhow::Result<()> {
 
     info!("starting LSP server");
 
-    // Create the transport. Includes the stdio (stdin and stdout) versions but this could
-    // also be implemented to use sockets or HTTP.
+    // Create the connection using stdio as the transport kind.
     let (connection, io_threads) = Connection::stdio();
 
-    // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
@@ -91,6 +89,8 @@ fn main() -> anyhow::Result<()> {
     .unwrap();
 
     let initialization_params = connection.initialize(server_capabilities)?;
+
+    // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     run(connection, initialization_params)?;
     io_threads.join()?;
 
