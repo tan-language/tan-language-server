@@ -9,6 +9,7 @@ use tan::api::parse_string;
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
+// #TODO remove this.
 fn cast<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
 where
     R: lsp_types::request::Request,
