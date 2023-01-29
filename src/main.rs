@@ -63,6 +63,7 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                 trace!("got response: {:?}", resp);
             }
             Message::Notification(not) => {
+                eprintln!("got notification: {not:?}");
                 trace!("got notification: {:?}", not);
             }
         }
@@ -90,8 +91,10 @@ fn main() -> anyhow::Result<()> {
 
     let initialization_params = connection.initialize(server_capabilities)?;
 
-    // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
+    // Run the server.
     run(connection, initialization_params)?;
+
+    // Wait for the two threads to end (typically by trigger LSP Exit event).
     io_threads.join()?;
 
     info!("shutting down server");
