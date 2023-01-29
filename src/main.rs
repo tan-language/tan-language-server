@@ -1,8 +1,11 @@
 use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
 use lsp_types::{
+    notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
     request::{GotoDefinition, References},
-    GotoDefinitionResponse, InitializeParams, OneOf, ServerCapabilities,
+    Diagnostic, DidChangeWatchedFilesParams, GotoDefinitionResponse, InitializeParams, OneOf,
+    PublishDiagnosticsParams, Range, ServerCapabilities,
 };
+use tan::api::parse_string;
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -21,6 +24,7 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
         trace!("got msg: {:?}", msg);
         match msg {
             Message::Request(req) => {
+                // eprintln!("-- {}", req.method);
                 if connection.handle_shutdown(&req)? {
                     return Ok(());
                 }
@@ -62,9 +66,63 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
             Message::Response(resp) => {
                 trace!("got response: {:?}", resp);
             }
-            Message::Notification(not) => {
-                eprintln!("got notification: {not:?}");
-                trace!("got notification: {:?}", not);
+            Message::Notification(event) => {
+                trace!("got notification: {:?}", event);
+                if let Ok(event) =
+                    event.extract::<DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD)
+                {
+                    for change in event.changes {
+                        let path = change.uri.path();
+                        let input = std::fs::read_to_string(path)?;
+                        let res = parse_string(&input);
+
+                        let mut diagnostics: Vec<Diagnostic> = Vec::new();
+
+                        if let Err(errors) = res {
+                            for error in errors {
+                                let start = tan::range::Position::from(error.1.start, &input);
+                                let start = lsp_types::Position {
+                                    line: start.line as u32,
+                                    character: start.col as u32,
+                                };
+                                let end = tan::range::Position::from(error.1.end, &input);
+                                let end = lsp_types::Position {
+                                    line: end.line as u32,
+                                    character: end.col as u32,
+                                };
+
+                                diagnostics.push(Diagnostic {
+                                    range: Range { start, end },
+                                    severity: None,
+                                    code: None,
+                                    code_description: None,
+                                    source: None,
+                                    message: error.0.to_string(),
+                                    related_information: None,
+                                    tags: None,
+                                    data: None,
+                                });
+                            }
+                        }
+
+                        let pdm = PublishDiagnosticsParams {
+                            uri: change.uri,
+                            diagnostics,
+                            version: None,
+                        };
+
+                        let notification = lsp_server::Notification {
+                            method: PublishDiagnostics::METHOD.to_owned(),
+                            params: serde_json::to_value(&pdm).unwrap(),
+                        };
+
+                        connection
+                            .sender
+                            .send(Message::Notification(notification))?;
+
+                        continue;
+                    }
+                }
             }
         }
     }
