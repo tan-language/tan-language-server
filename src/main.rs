@@ -5,8 +5,8 @@ use lsp_types::{
     Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, InitializeParams, OneOf,
     Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
 };
-use tan::api::parse_string;
-use tan_fmt::format_expr_compact;
+use tan::api::{lex_string, parse_string};
+use tan_fmt::pretty::Formatter;
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -72,11 +72,19 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
 
                         let path = params.text_document.uri.path();
                         let input = std::fs::read_to_string(path)?;
-                        let Ok(expr) = parse_string(&input) else {
+
+                        // let Ok(expr) = parse_string(&input) else {
+                        //     return Err(anyhow::anyhow!("Error"));
+                        // };
+
+                        // let formatted = format_expr_compact(&expr.0);
+
+                        let Ok(tokens) = lex_string(&input) else {
                             return Err(anyhow::anyhow!("Error"));
                         };
 
-                        let formatted = format_expr_compact(&expr.0);
+                        let mut formatter = Formatter::new(tokens);
+                        let formatted = formatter.format().unwrap();
 
                         // Select the whole document dore replacement
                         let start = Position::new(0, 0);
