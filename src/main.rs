@@ -2,8 +2,8 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
     request::{Formatting, Request},
-    Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, InitializeParams, OneOf,
-    Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
+    Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, OneOf, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
 };
 use tan::api::{lex_string, parse_string};
 use tan_fmt::pretty::Formatter;
@@ -21,8 +21,9 @@ use tracing_subscriber::util::SubscriberInitExt;
 //     req.extract(R::METHOD)
 // }
 
-fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> {
-    let _params: InitializeParams = serde_json::from_value(params).unwrap();
+fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()> {
+    // #TODO use params to get root_uri and perform initial diagnostics for all files.
+    // let params: InitializeParams = serde_json::from_value(params).unwrap();
 
     for msg in &connection.receiver {
         trace!("got msg: {:?}", msg);
@@ -76,7 +77,6 @@ fn run(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> 
                         // let Ok(expr) = parse_string(&input) else {
                         //     return Err(anyhow::anyhow!("Error"));
                         // };
-
                         // let formatted = format_expr_compact(&expr.0);
 
                         let Ok(tokens) = lex_string(&input) else {
