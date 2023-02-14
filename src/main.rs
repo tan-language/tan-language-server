@@ -3,7 +3,7 @@ use lsp_types::{
     notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
     request::{Formatting, Request},
     Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, OneOf, Position,
-    PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
+    PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit, Url,
 };
 use tan::api::{lex_string, parse_string};
 use tan_fmt::pretty::Formatter;
@@ -20,6 +20,55 @@ use tracing_subscriber::util::SubscriberInitExt;
 // {
 //     req.extract(R::METHOD)
 // }
+
+// #TODO find a good name.
+pub fn parse_diagnostics(uri: &Url) -> anyhow::Result<lsp_server::Notification> {
+    let path = uri.path();
+    let input = std::fs::read_to_string(path)?;
+    let res = parse_string(&input);
+
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+
+    if let Err(errors) = res {
+        for error in errors {
+            let start = tan::range::Position::from(error.1.start, &input);
+            let start = lsp_types::Position {
+                line: start.line as u32,
+                character: start.col as u32,
+            };
+            let end = tan::range::Position::from(error.1.end, &input);
+            let end = lsp_types::Position {
+                line: end.line as u32,
+                character: end.col as u32,
+            };
+
+            diagnostics.push(Diagnostic {
+                range: Range { start, end },
+                severity: None,
+                code: None,
+                code_description: None,
+                source: None,
+                message: error.0.to_string(),
+                related_information: None,
+                tags: None,
+                data: None,
+            });
+        }
+    }
+
+    let pdm = PublishDiagnosticsParams {
+        uri: uri.clone(),
+        diagnostics,
+        version: None,
+    };
+
+    let notification = lsp_server::Notification {
+        method: PublishDiagnostics::METHOD.to_owned(),
+        params: serde_json::to_value(&pdm).unwrap(),
+    };
+
+    Ok(notification)
+}
 
 fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()> {
     // #TODO use params to get root_uri and perform initial diagnostics for all files.
@@ -115,49 +164,7 @@ fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()>
                     event.extract::<DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD)
                 {
                     for change in event.changes {
-                        let path = change.uri.path();
-                        let input = std::fs::read_to_string(path)?;
-                        let res = parse_string(&input);
-
-                        let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-                        if let Err(errors) = res {
-                            for error in errors {
-                                let start = tan::range::Position::from(error.1.start, &input);
-                                let start = lsp_types::Position {
-                                    line: start.line as u32,
-                                    character: start.col as u32,
-                                };
-                                let end = tan::range::Position::from(error.1.end, &input);
-                                let end = lsp_types::Position {
-                                    line: end.line as u32,
-                                    character: end.col as u32,
-                                };
-
-                                diagnostics.push(Diagnostic {
-                                    range: Range { start, end },
-                                    severity: None,
-                                    code: None,
-                                    code_description: None,
-                                    source: None,
-                                    message: error.0.to_string(),
-                                    related_information: None,
-                                    tags: None,
-                                    data: None,
-                                });
-                            }
-                        }
-
-                        let pdm = PublishDiagnosticsParams {
-                            uri: change.uri,
-                            diagnostics,
-                            version: None,
-                        };
-
-                        let notification = lsp_server::Notification {
-                            method: PublishDiagnostics::METHOD.to_owned(),
-                            params: serde_json::to_value(&pdm).unwrap(),
-                        };
+                        let notification = parse_diagnostics(&change.uri)?;
 
                         connection
                             .sender

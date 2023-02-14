@@ -19,4 +19,5 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tan = { path = "../tan", version = "0.4" }
 tan_fmt = { path = "../tan_fmt", version = "0.4" }
+tan_lint = { path = "../tan_lint", version = "0.4" }
 tan_lsp = { path = "tan_lsp", version = "0.4" }
