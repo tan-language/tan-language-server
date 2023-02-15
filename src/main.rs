@@ -3,71 +3,51 @@ use lsp_types::{
     notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
     request::{Formatting, Request},
     Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, OneOf, Position,
-    PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit, Url,
+    PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
 };
-use tan::api::{lex_string, parse_string};
+use tan::error::Error;
+use tan::{
+    api::{lex_string, parse_string_all},
+    range::Ranged,
+};
 use tan_fmt::pretty::Formatter;
+use tan_lint::{lints::snake_case_names_lint::SnakeCaseNamesLint, Lint};
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
-// // #TODO remove this.
-// fn cast<R>(
-//     req: lsp_server::Request,
-// ) -> Result<(RequestId, R::Params), ExtractError<lsp_server::Request>>
-// where
-//     R: lsp_types::request::Request,
-//     R::Params: serde::de::DeserializeOwned,
-// {
-//     req.extract(R::METHOD)
-// }
-
 // #TODO find a good name.
-pub fn parse_diagnostics(uri: &Url) -> anyhow::Result<lsp_server::Notification> {
-    let path = uri.path();
-    let input = std::fs::read_to_string(path)?;
-    let res = parse_string(&input);
-
+pub fn emit_parse_error_diagnostics(
+    input: &str,
+    errors: Vec<Ranged<Error>>,
+) -> anyhow::Result<Vec<Diagnostic>> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
-    if let Err(errors) = res {
-        for error in errors {
-            let start = tan::range::Position::from(error.1.start, &input);
-            let start = lsp_types::Position {
-                line: start.line as u32,
-                character: start.col as u32,
-            };
-            let end = tan::range::Position::from(error.1.end, &input);
-            let end = lsp_types::Position {
-                line: end.line as u32,
-                character: end.col as u32,
-            };
+    for error in errors {
+        let start = tan::range::Position::from(error.1.start, input);
+        let start = lsp_types::Position {
+            line: start.line as u32,
+            character: start.col as u32,
+        };
+        let end = tan::range::Position::from(error.1.end, input);
+        let end = lsp_types::Position {
+            line: end.line as u32,
+            character: end.col as u32,
+        };
 
-            diagnostics.push(Diagnostic {
-                range: Range { start, end },
-                severity: None,
-                code: None,
-                code_description: None,
-                source: None,
-                message: error.0.to_string(),
-                related_information: None,
-                tags: None,
-                data: None,
-            });
-        }
+        diagnostics.push(Diagnostic {
+            range: Range { start, end },
+            severity: None,
+            code: None,
+            code_description: None,
+            source: None,
+            message: error.0.to_string(),
+            related_information: None,
+            tags: None,
+            data: None,
+        });
     }
 
-    let pdm = PublishDiagnosticsParams {
-        uri: uri.clone(),
-        diagnostics,
-        version: None,
-    };
-
-    let notification = lsp_server::Notification {
-        method: PublishDiagnostics::METHOD.to_owned(),
-        params: serde_json::to_value(&pdm).unwrap(),
-    };
-
-    Ok(notification)
+    Ok(diagnostics)
 }
 
 fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()> {
@@ -164,7 +144,33 @@ fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()>
                     event.extract::<DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD)
                 {
                     for change in event.changes {
-                        let notification = parse_diagnostics(&change.uri)?;
+                        let path = change.uri.path();
+                        let input = std::fs::read_to_string(path)?;
+                        let result = parse_string_all(&input);
+
+                        let diagnostics = match result {
+                            Ok(exprs) => {
+                                let mut diagnostics = Vec::new();
+
+                                let mut lint = SnakeCaseNamesLint::new(&input);
+                                lint.run(&exprs);
+                                diagnostics.append(&mut lint.diagnostics);
+
+                                diagnostics
+                            }
+                            Err(errors) => emit_parse_error_diagnostics(&input, errors)?,
+                        };
+
+                        let pdm = PublishDiagnosticsParams {
+                            uri: change.uri.clone(),
+                            diagnostics,
+                            version: None,
+                        };
+
+                        let notification = lsp_server::Notification {
+                            method: PublishDiagnostics::METHOD.to_owned(),
+                            params: serde_json::to_value(&pdm).unwrap(),
+                        };
 
                         connection
                             .sender
