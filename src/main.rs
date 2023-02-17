@@ -6,10 +6,7 @@ use lsp_types::{
     PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
 };
 use tan::error::Error;
-use tan::{
-    api::{lex_string, parse_string_all},
-    range::Ranged,
-};
+use tan::{api::parse_string_all, range::Ranged};
 use tan_fmt::pretty::Formatter;
 use tan_lint::{lints::snake_case_names_lint::SnakeCaseNamesLint, Lint};
 use tracing::{info, trace};
@@ -103,17 +100,12 @@ fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()>
                         let path = params.text_document.uri.path();
                         let input = std::fs::read_to_string(path)?;
 
-                        // let Ok(expr) = parse_string(&input) else {
-                        //     return Err(anyhow::anyhow!("Error"));
-                        // };
-                        // let formatted = format_expr_compact(&expr.0);
-
-                        let Ok(tokens) = lex_string(&input) else {
+                        let Ok(exprs) = parse_string_all(&input) else {
                             return Err(anyhow::anyhow!("Error"));
                         };
 
-                        let mut formatter = Formatter::new(tokens);
-                        let formatted = formatter.format().unwrap();
+                        let mut formatter = Formatter::new(&exprs);
+                        let formatted = formatter.format();
 
                         // Select the whole document dore replacement
                         let start = Position::new(0, 0);
