@@ -3,7 +3,7 @@ use lsp_types::{
     notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
     request::{Formatting, Request},
     Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, OneOf, Position,
-    PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit,
+    PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit, Url,
 };
 use tan::error::Error;
 use tan::{api::parse_string_all, range::Ranged};
@@ -12,8 +12,7 @@ use tan_lint::{lints::snake_case_names_lint::SnakeCaseNamesLint, Lint};
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
-// #TODO find a good name.
-pub fn emit_parse_error_diagnostics(
+pub fn compute_parse_error_diagnostics(
     input: &str,
     errors: Vec<Ranged<Error>>,
 ) -> anyhow::Result<Vec<Diagnostic>> {
@@ -47,9 +46,60 @@ pub fn emit_parse_error_diagnostics(
     Ok(diagnostics)
 }
 
+pub fn compute_diagnostics(uri: &Url) -> anyhow::Result<Vec<Diagnostic>> {
+    let path = uri.path();
+    let input = std::fs::read_to_string(path)?;
+    let result = parse_string_all(&input);
+
+    let diagnostics = match result {
+        Ok(exprs) => {
+            let mut diagnostics = Vec::new();
+
+            let mut lint = SnakeCaseNamesLint::new(&input);
+            lint.run(&exprs);
+            diagnostics.append(&mut lint.diagnostics);
+
+            diagnostics
+        }
+        Err(errors) => compute_parse_error_diagnostics(&input, errors)?,
+    };
+
+    Ok(diagnostics)
+}
+
+pub fn send_diagnostics(connection: &Connection, uri: Url) -> anyhow::Result<()> {
+    let diagnostics = compute_diagnostics(&uri)?;
+
+    // #Insight
+    // We send a notification even for empty diagnostics to clear previous
+    // diagnostics.
+
+    // if diagnostics.is_empty() {
+    //     return Ok(());
+    // }
+
+    let pdm = PublishDiagnosticsParams {
+        uri: uri.clone(),
+        diagnostics,
+        version: None,
+    };
+
+    let notification = lsp_server::Notification {
+        method: PublishDiagnostics::METHOD.to_owned(),
+        params: serde_json::to_value(&pdm).unwrap(),
+    };
+
+    connection
+        .sender
+        .send(Message::Notification(notification))?;
+
+    Ok(())
+}
+
 fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()> {
     // #TODO use params to get root_uri and perform initial diagnostics for all files.
     // let params: InitializeParams = serde_json::from_value(params).unwrap();
+    // eprintln!("{params:#?}");
 
     for msg in &connection.receiver {
         trace!("got msg: {:?}", msg);
@@ -136,37 +186,39 @@ fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()>
                     event.extract::<DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD)
                 {
                     for change in event.changes {
-                        let path = change.uri.path();
-                        let input = std::fs::read_to_string(path)?;
-                        let result = parse_string_all(&input);
+                        // let path = change.uri.path();
+                        // let input = std::fs::read_to_string(path)?;
+                        // let result = parse_string_all(&input);
 
-                        let diagnostics = match result {
-                            Ok(exprs) => {
-                                let mut diagnostics = Vec::new();
+                        // let diagnostics = match result {
+                        //     Ok(exprs) => {
+                        //         let mut diagnostics = Vec::new();
 
-                                let mut lint = SnakeCaseNamesLint::new(&input);
-                                lint.run(&exprs);
-                                diagnostics.append(&mut lint.diagnostics);
+                        //         let mut lint = SnakeCaseNamesLint::new(&input);
+                        //         lint.run(&exprs);
+                        //         diagnostics.append(&mut lint.diagnostics);
 
-                                diagnostics
-                            }
-                            Err(errors) => emit_parse_error_diagnostics(&input, errors)?,
-                        };
+                        //         diagnostics
+                        //     }
+                        //     Err(errors) => gen_parse_error_diagnostics(&input, errors)?,
+                        // };
 
-                        let pdm = PublishDiagnosticsParams {
-                            uri: change.uri.clone(),
-                            diagnostics,
-                            version: None,
-                        };
+                        // let pdm = PublishDiagnosticsParams {
+                        //     uri: change.uri.clone(),
+                        //     diagnostics,
+                        //     version: None,
+                        // };
 
-                        let notification = lsp_server::Notification {
-                            method: PublishDiagnostics::METHOD.to_owned(),
-                            params: serde_json::to_value(&pdm).unwrap(),
-                        };
+                        // let notification = lsp_server::Notification {
+                        //     method: PublishDiagnostics::METHOD.to_owned(),
+                        //     params: serde_json::to_value(&pdm).unwrap(),
+                        // };
 
-                        connection
-                            .sender
-                            .send(Message::Notification(notification))?;
+                        // connection
+                        //     .sender
+                        //     .send(Message::Notification(notification))?;
+
+                        send_diagnostics(&connection, change.uri)?;
                     }
                 }
             }
