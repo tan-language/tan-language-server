@@ -12,6 +12,7 @@ use tan_lint::{lints::snake_case_names_lint::SnakeCaseNamesLint, Lint};
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
+// #TODO use the compute functions from the tan_lint package.
 pub fn compute_parse_error_diagnostics(
     input: &str,
     errors: Vec<Ranged<Error>>,
