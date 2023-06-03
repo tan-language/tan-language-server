@@ -2,74 +2,19 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     notification::{DidChangeWatchedFiles, Notification, PublishDiagnostics},
     request::{Formatting, Request},
-    Diagnostic, DidChangeWatchedFilesParams, DocumentFormattingParams, OneOf, Position,
+    DidChangeWatchedFilesParams, DocumentFormattingParams, OneOf, Position,
     PublishDiagnosticsParams, Range, ServerCapabilities, TextEdit, Url,
 };
-use tan::error::Error;
-use tan::{api::parse_string_all, range::Ranged};
+use tan::api::parse_string_all;
 use tan_fmt::pretty::Formatter;
-use tan_lint::{lints::snake_case_names_lint::SnakeCaseNamesLint, Lint};
+use tan_lint::compute_diagnostics;
 use tracing::{info, trace};
 use tracing_subscriber::util::SubscriberInitExt;
 
-// #TODO use the compute functions from the tan_lint package.
-pub fn compute_parse_error_diagnostics(
-    input: &str,
-    errors: Vec<Ranged<Error>>,
-) -> anyhow::Result<Vec<Diagnostic>> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-    for error in errors {
-        let start = tan::range::Position::from(error.1.start, input);
-        let start = lsp_types::Position {
-            line: start.line as u32,
-            character: start.col as u32,
-        };
-        let end = tan::range::Position::from(error.1.end, input);
-        let end = lsp_types::Position {
-            line: end.line as u32,
-            character: end.col as u32,
-        };
-
-        diagnostics.push(Diagnostic {
-            range: Range { start, end },
-            severity: None,
-            code: None,
-            code_description: None,
-            source: None,
-            message: error.0.to_string(),
-            related_information: None,
-            tags: None,
-            data: None,
-        });
-    }
-
-    Ok(diagnostics)
-}
-
-pub fn compute_diagnostics(uri: &Url) -> anyhow::Result<Vec<Diagnostic>> {
-    let path = uri.path();
-    let input = std::fs::read_to_string(path)?;
-    let result = parse_string_all(&input);
-
-    let diagnostics = match result {
-        Ok(exprs) => {
-            let mut diagnostics = Vec::new();
-
-            let mut lint = SnakeCaseNamesLint::new(&input);
-            lint.run(&exprs);
-            diagnostics.append(&mut lint.diagnostics);
-
-            diagnostics
-        }
-        Err(errors) => compute_parse_error_diagnostics(&input, errors)?,
-    };
-
-    Ok(diagnostics)
-}
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn send_diagnostics(connection: &Connection, uri: Url) -> anyhow::Result<()> {
-    let diagnostics = compute_diagnostics(&uri)?;
+    let diagnostics = compute_diagnostics(uri.as_str());
 
     // #Insight
     // We send a notification even for empty diagnostics to clear previous
@@ -103,7 +48,7 @@ fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()>
     // eprintln!("{params:#?}");
 
     for msg in &connection.receiver {
-        trace!("got msg: {:?}", msg);
+        trace!("Got msg: {:?}.", msg);
         match msg {
             Message::Request(req) => {
                 if connection.handle_shutdown(&req)? {
@@ -179,10 +124,10 @@ fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()>
                 }
             }
             Message::Response(resp) => {
-                trace!("got response: {:?}", resp);
+                trace!("Got response: {:?}.", resp);
             }
             Message::Notification(event) => {
-                trace!("got notification: {:?}", event);
+                trace!("got notification: {:?}.", event);
                 if let Ok(event) =
                     event.extract::<DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD)
                 {
@@ -234,7 +179,7 @@ fn main() -> anyhow::Result<()> {
         .finish()
         .init();
 
-    info!("starting LSP server");
+    info!("Starting LSP server, v{VERSION}...");
 
     // Create the connection using stdio as the transport kind.
     let (connection, io_threads) = Connection::stdio();
@@ -249,13 +194,15 @@ fn main() -> anyhow::Result<()> {
 
     let initialization_params = connection.initialize(server_capabilities)?;
 
+    info!("Started.");
+
     // Run the server.
     run(connection, initialization_params)?;
 
     // Wait for the two threads to end (typically by trigger LSP Exit event).
     io_threads.join()?;
 
-    info!("shutting down server");
+    info!("Shutting down server...");
 
     Ok(())
 }
