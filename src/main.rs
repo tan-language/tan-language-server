@@ -176,6 +176,7 @@ fn run(connection: Connection, _params: serde_json::Value) -> anyhow::Result<()>
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        .with_ansi(false)
         .finish()
         .init();
 
