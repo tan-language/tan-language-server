@@ -149,14 +149,18 @@ impl Server {
                                 return Err(anyhow!("Unknown document").context("in Formatting::METHOD"));
                             };
 
+                            // #TODO don't parse all the time? is this even possible, probably not the input changed here.
+
                             let Ok(exprs) = parse_string_all(&input) else {
                                 return Err(anyhow::anyhow!("Error"));
                             };
 
-                            let mut formatter = Formatter::new(&exprs);
+                            let formatter = Formatter::new(&exprs);
                             let formatted = formatter.format();
 
-                            // Select the whole document dore replacement
+                            // #TODO does it make sense to compute diffs?
+
+                            // Select the whole document for replacement
                             let start = Position::new(0, 0);
                             let end = Position::new(u32::MAX, u32::MAX);
                             let document_range = Range::new(start, end);
