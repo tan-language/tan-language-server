@@ -11,7 +11,7 @@ use lsp_types::{
 };
 use tan::api::parse_string_all;
 use tan_fmt::pretty::Formatter;
-use tan_lint::compute_diagnostics;
+use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
 use crate::util::VERSION;
