@@ -1,12 +1,13 @@
-# Tan LSP Server
+# Tan Language Server
 
-The server exposes the Tan Analyzer through LSP (Language Server Protocol).
-This server is used by the `vscode_tan` extension.
+A [Language Server](https://microsoft.github.io/language-server-protocol/) implementation for Tan.
+
+This server is used by the `vscode-tan` extension.
 
 ## Setup
 
 ```sh
-cargo install tan_lsp_server
+cargo install tan-language-server
 ```
 
 ## Status

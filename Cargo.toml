@@ -1,5 +1,5 @@
 [package]
-name = "tan_lsp_server"
+name = "tan-language-server"
 description = "An LSP server for the Tan Language"
 version = "0.7.0"
 edition = "2021"
