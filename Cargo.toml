@@ -4,7 +4,7 @@ description = "An LSP server for the Tan Language"
 version = "0.7.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/tanlang-org/tan_lsp_server"
+repository = "https://github.com/tan-language/tan_lsp_server"
 keywords = ["tan", "language", "lsp", "ide"]
 authors = ["George Moschovitis <gmosx@reizu.org>"]
 
@@ -18,5 +18,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tan = { path = "../tan", version = "0.7" }
-tan_fmt = { path = "../tan_fmt", version = "0.7" }
+tan-formatting = { path = "../tan-formatting", version = "0.7" }
 tan-lints = { path = "../tan-lints", version = "0.7" }

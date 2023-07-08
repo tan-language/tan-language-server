@@ -10,7 +10,7 @@ use lsp_types::{
     Url,
 };
 use tan::api::parse_string_all;
-use tan_fmt::pretty::Formatter;
+use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
