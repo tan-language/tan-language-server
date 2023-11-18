@@ -146,7 +146,9 @@ impl Server {
                             let document = params.text_document;
 
                             let Some(input) = self.documents.get(document.uri.as_str()) else {
-                                return Err(anyhow!("Unknown document").context("in Formatting::METHOD"));
+                                return Err(
+                                    anyhow!("Unknown document").context("in Formatting::METHOD")
+                                );
                             };
 
                             // #TODO don't parse all the time? is this even possible, probably not the input changed here.
