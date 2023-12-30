@@ -6,7 +6,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use crate::server::Server;
 
 fn init_tracing() {
-    // #TODO RUST_LOG is not passed from vscode, investigate.
+    // #todo RUST_LOG is not passed from vscode, investigate.
 
     let fmt_layer = fmt::layer()
         .with_target(false)
@@ -26,7 +26,7 @@ fn init_tracing() {
 fn main() -> anyhow::Result<()> {
     init_tracing();
 
-    // #TODO mut sucks here.
+    // #todo mut sucks here.
     let mut server = Server::new();
     server.run()?;
 

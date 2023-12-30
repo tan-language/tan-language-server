@@ -20,7 +20,7 @@ pub struct Server {
     documents: HashMap<String, String>,
 }
 
-// #TODO split further into methods.
+// #todo split further into methods.
 
 impl Server {
     pub fn new() -> Self {
@@ -62,7 +62,7 @@ impl Server {
         Ok(())
     }
 
-    // #TODO return a more precise result.
+    // #todo return a more precise result.
     pub fn send_diagnostics(&self, connection: &Connection, uri: Url) -> anyhow::Result<()> {
         let Some(input) = self.documents.get(uri.as_str()) else {
             return Err(anyhow!("Unknown document").context("in send_diagnostics"));
@@ -93,7 +93,7 @@ impl Server {
         connection: Connection,
         _params: serde_json::Value,
     ) -> anyhow::Result<()> {
-        // #TODO use params to get root_uri and perform initial diagnostics for all files.
+        // #todo use params to get root_uri and perform initial diagnostics for all files.
         // let params: InitializeParams = serde_json::from_value(params).unwrap();
         // eprintln!("{params:#?}");
 
@@ -151,7 +151,7 @@ impl Server {
                                 );
                             };
 
-                            // #TODO don't parse all the time? is this even possible, probably not the input changed here.
+                            // #todo don't parse all the time? is this even possible, probably not the input changed here.
 
                             let Ok(exprs) = parse_string_all(&input) else {
                                 return Err(anyhow::anyhow!("Error"));
@@ -160,7 +160,7 @@ impl Server {
                             let formatter = Formatter::new(&exprs);
                             let formatted = formatter.format();
 
-                            // #TODO does it make sense to compute diffs?
+                            // #todo does it make sense to compute diffs?
 
                             // Select the whole document for replacement
                             let start = Position::new(0, 0);
@@ -225,7 +225,7 @@ impl Server {
                     //     }
                     // }
 
-                    // #TODO try to switch to incremental sync.
+                    // #todo try to switch to incremental sync.
                 }
             }
         }
