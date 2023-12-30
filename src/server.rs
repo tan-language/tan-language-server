@@ -34,7 +34,7 @@ impl Server {
 
         let (connection, io_threads) = Connection::stdio();
 
-        let server_capabilities = serde_json::to_value(&ServerCapabilities {
+        let server_capabilities = serde_json::to_value(ServerCapabilities {
             // definition_provider: Some(OneOf::Left(true)),
             // references_provider: Some(OneOf::Left(true)),
             // #Insight Enables didOpen/didChange notifications.
@@ -78,7 +78,7 @@ impl Server {
 
         let notification = lsp_server::Notification {
             method: PublishDiagnostics::METHOD.to_owned(),
-            params: serde_json::to_value(&pdm).unwrap(),
+            params: serde_json::to_value(pdm).unwrap(),
         };
 
         connection
@@ -153,7 +153,7 @@ impl Server {
 
                             // #todo don't parse all the time? is this even possible, probably not the input changed here.
 
-                            let Ok(exprs) = parse_string_all(&input) else {
+                            let Ok(exprs) = parse_string_all(input) else {
                                 return Err(anyhow::anyhow!("Error"));
                             };
 
