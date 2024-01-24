@@ -14,7 +14,7 @@ use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
-use crate::util::VERSION;
+use crate::util::{dialect_from_document_uri, VERSION};
 
 pub struct Server {
     documents: HashMap<String, String>,
@@ -157,7 +157,9 @@ impl Server {
                                 return Err(anyhow::anyhow!("Error"));
                             };
 
-                            let formatter = Formatter::new(&exprs);
+                            let dialect = dialect_from_document_uri(document.uri.as_str());
+
+                            let formatter = Formatter::for_dialect(&exprs, dialect);
                             let formatted = formatter.format();
 
                             // #todo does it make sense to compute diffs?
