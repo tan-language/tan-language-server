@@ -1,9 +1,11 @@
+use tan_formatting::types::Dialect;
+
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn dialect_from_document_uri(uri: &str) -> &'static str {
+pub fn dialect_from_document_uri(uri: &str) -> Dialect {
     if uri.ends_with(".data.tan") {
-        "data"
+        Dialect::Data
     } else {
-        "code"
+        Dialect::Code
     }
 }
