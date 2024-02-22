@@ -4,7 +4,7 @@ description = "An LSP server for the Tan Language"
 version = "0.12.0"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/tan-language/tan_lsp_server"
+repository = "https://github.com/tan-language/tan-language-server"
 keywords = ["tan", "language", "lsp", "ide"]
 authors = ["George Moschovitis <gmosx@reizu.org>"]
 

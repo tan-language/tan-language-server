@@ -1,6 +1,7 @@
 # Tan Language Server
 
-A [Language Server](https://microsoft.github.io/language-server-protocol/) implementation for Tan.
+A [Language Server](https://microsoft.github.io/language-server-protocol/)
+implementation for Tan.
 
 This server is used by the `vscode-tan` extension.
 
@@ -21,7 +22,9 @@ features and bug fixes.
 
 ## License
 
-This work is licensed under the Apache-2.0 License. See [LICENSE.txt](LICENSE.txt) or <https://spdx.org/licenses/Apache-2.0.html> for details.
+This work is licensed under the Apache-2.0 License. See
+[LICENSE.txt](LICENSE.txt) or <https://spdx.org/licenses/Apache-2.0.html> for
+details.
 
 ## Copyright
 
