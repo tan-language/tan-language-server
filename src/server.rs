@@ -14,7 +14,7 @@ use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
-use crate::util::{dialect_from_document_uri, VERSION};
+use crate::util::{dialect_from_document_uri, send_server_status_notification, VERSION};
 
 pub struct Server {
     documents: HashMap<String, String>,
@@ -50,6 +50,7 @@ impl Server {
         let initialization_params = connection.initialize(server_capabilities)?;
 
         info!("Started.");
+        send_server_status_notification(&connection, "started")?;
 
         // Run the server.
         self.run_loop(connection, initialization_params)?;
@@ -140,6 +141,8 @@ impl Server {
 
                     match req.method.as_ref() {
                         Formatting::METHOD => {
+                            send_server_status_notification(&connection, "formatting")?;
+
                             let (id, params) =
                                 req.extract::<DocumentFormattingParams>(Formatting::METHOD)?;
 
@@ -176,6 +179,8 @@ impl Server {
                                 result: Some(result),
                                 error: None,
                             };
+
+                            send_server_status_notification(&connection, "formatted")?;
 
                             connection.sender.send(Message::Response(resp))?;
 

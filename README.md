@@ -20,6 +20,10 @@ This is an _experimental_ project, not intended for production use.
 Pull requests, issues, and comments are welcome! Make sure to add tests for new
 features and bug fixes.
 
+## Hints
+
+Use `stderr` to log messages for the editor output channel.
+
 ## License
 
 This work is licensed under the Apache-2.0 License. See
@@ -28,4 +32,4 @@ details.
 
 ## Copyright
 
-Copyright © 2023 [Georgios Moschovitis](https://gmosx.ninja).
+Copyright © 2023 [George Moschovitis](https://gmosx.ninja).
