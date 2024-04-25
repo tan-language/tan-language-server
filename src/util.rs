@@ -9,7 +9,9 @@ use crossbeam::channel::SendError;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn dialect_from_document_uri(uri: &str) -> Dialect {
-    if uri.ends_with(".data.tan") {
+    // #todo I don't think dialect is the correct word.
+    // #todo introduce HTML and CSS dialects.
+    if uri.ends_with(".data.tan") || uri.ends_with(".config.tan") {
         Dialect::Data
     } else {
         Dialect::Code
