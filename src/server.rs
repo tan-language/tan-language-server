@@ -5,9 +5,10 @@ use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
     request::{DocumentSymbolRequest, Formatting, Request},
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams, OneOf,
-    Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncKind, TextEdit,
-    Uri,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
+    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, OneOf, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, SymbolKind, TextDocumentSyncKind,
+    TextEdit, Uri,
 };
 use tan::api::parse_string_all;
 use tan_formatting::pretty::Formatter;
@@ -144,10 +145,51 @@ impl Server {
                     //     Err(ExtractError::MethodMismatch(req)) => req,
                     // };
 
-                    trace!(".......0");
+                    // #todo also handle "textDocument/hover".
+
                     match req.method.as_ref() {
+                        // "textDocument/documentSymbol"
                         DocumentSymbolRequest::METHOD => {
                             trace!("--->> DOCUMENT SYMBOL <<---");
+
+                            let (id, _params) =
+                                req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
+                            // let result = document_symbol_handler(&params);
+                            // let response = Response::new_ok(req.id, result);
+                            // connection.sender.send(response.into()).unwrap();
+                            // let result = S
+
+                            // let result = Some(vec![TextEdit::new(document_range, formatted)]);
+
+                            // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
+                            // #todo let's go for Nested!
+
+                            // #todo this is a dummy range.
+                            let start = Position::new(0, 0);
+                            let end = Position::new(u32::MAX, u32::MAX);
+                            let range = Range::new(start, end);
+
+                            #[allow(deprecated)]
+                            let ds = DocumentSymbol {
+                                name: String::from("dummy"),
+                                detail: None,
+                                kind: SymbolKind::FUNCTION,
+                                tags: None,
+                                deprecated: None,
+                                range,
+                                selection_range: range,
+                                children: None,
+                            };
+
+                            let result = DocumentSymbolResponse::Nested(vec![ds]);
+                            let result =
+                                serde_json::to_value::<DocumentSymbolResponse>(result).unwrap();
+                            let resp = Response {
+                                id,
+                                result: Some(result),
+                                error: None,
+                            };
+                            connection.sender.send(Message::Response(resp))?;
                         }
                         Formatting::METHOD => {
                             send_server_status_notification(&connection, "formatting")?;
