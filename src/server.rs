@@ -4,10 +4,11 @@ use anyhow::anyhow;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
-    request::{Formatting, Request},
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams, OneOf,
-    Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncKind, TextEdit,
-    Uri,
+    request::{DocumentSymbolRequest, Formatting, Request},
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
+    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
+    TextDocumentSyncKind, TextEdit, Uri,
 };
 use tan::api::parse_string_all;
 use tan_formatting::pretty::Formatter;
@@ -15,6 +16,10 @@ use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
 use crate::util::{dialect_from_document_uri, send_server_status_notification, VERSION};
+
+// #insight
+// For debugging use trace! and similar functions, the traces are logged in the
+// `Tan Language` tab of the Output panel, in VS Code.
 
 pub struct Server {
     documents: HashMap<String, String>,
@@ -37,7 +42,8 @@ impl Server {
         let server_capabilities = serde_json::to_value(ServerCapabilities {
             // definition_provider: Some(OneOf::Left(true)),
             // references_provider: Some(OneOf::Left(true)),
-            // #Insight Enables didOpen/didChange notifications.
+            // #insight Enables didOpen/didChange notifications.
+            document_symbol_provider: Some(OneOf::Left(true)),
             text_document_sync: Some(lsp_types::TextDocumentSyncCapability::Kind(
                 TextDocumentSyncKind::FULL,
             )),
@@ -139,7 +145,80 @@ impl Server {
                     //     Err(ExtractError::MethodMismatch(req)) => req,
                     // };
 
+                    // #todo also handle "textDocument/hover".
+
                     match req.method.as_ref() {
+                        // "textDocument/documentSymbol"
+                        DocumentSymbolRequest::METHOD => {
+                            trace!("--->> DOCUMENT SYMBOL <<---");
+
+                            let (id, params) =
+                                req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
+                            // let result = document_symbol_handler(&params);
+                            // let response = Response::new_ok(req.id, result);
+                            // connection.sender.send(response.into()).unwrap();
+                            // let result = S
+
+                            // let result = Some(vec![TextEdit::new(document_range, formatted)]);
+
+                            // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
+                            // #todo let's go for Nested!
+
+                            // #todo this is a dummy range.
+                            let start = Position::new(0, 0);
+                            let end = Position::new(u32::MAX, u32::MAX);
+                            let range = Range::new(start, end);
+
+                            // #todo for some reason, the Nested form was not working! investigate.
+                            // #todo maybe we need to populate `children`?
+                            // #[allow(deprecated)]
+                            // let _ds = DocumentSymbol {
+                            //     name: String::from("dummy"),
+                            //     detail: None,
+                            //     kind: SymbolKind::FUNCTION,
+                            //     tags: None,
+                            //     deprecated: None,
+                            //     range,
+                            //     selection_range: range,
+                            //     children: None,
+                            // };
+
+                            let location = Location {
+                                uri: params.text_document.uri,
+                                range,
+                            };
+
+                            #[allow(deprecated)]
+                            let info1 = SymbolInformation {
+                                name: String::from("dummy"),
+                                kind: SymbolKind::FUNCTION,
+                                tags: None,
+                                deprecated: None,
+                                location: location.clone(),
+                                container_name: None,
+                            };
+
+                            #[allow(deprecated)]
+                            let info2 = SymbolInformation {
+                                name: String::from("another-one"),
+                                kind: SymbolKind::VARIABLE,
+                                tags: None,
+                                deprecated: None,
+                                location,
+                                container_name: None,
+                            };
+
+                            // let result = DocumentSymbolResponse::Nested(vec![ds]);
+                            let result = DocumentSymbolResponse::Flat(vec![info1, info2]);
+                            let result =
+                                serde_json::to_value::<DocumentSymbolResponse>(result).unwrap();
+                            let resp = Response {
+                                id,
+                                result: Some(result),
+                                error: None,
+                            };
+                            connection.sender.send(Message::Response(resp))?;
+                        }
                         Formatting::METHOD => {
                             send_server_status_notification(&connection, "formatting")?;
 
@@ -207,6 +286,7 @@ impl Server {
                             }
                         }
                         "textDocument/didChange" => {
+                            // #todo #perf support incremental updates for formatting, documentSymbols, etc...
                             if let Ok(params) = notification.extract::<DidChangeTextDocumentParams>(
                                 DidChangeTextDocument::METHOD,
                             ) {
