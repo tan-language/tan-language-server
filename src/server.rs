@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::anyhow;
 use lsp_server::{Connection, Message, Response};
@@ -6,11 +6,18 @@ use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
     request::{DocumentSymbolRequest, Formatting, Request},
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
-    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
+    DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::api::parse_string_all;
+use tan::{
+    api::{eval_string, parse_string_all},
+    context::Context,
+    eval::util::eval_file,
+    expr::Expr,
+    scope::Scope,
+    util::standard_names::CURRENT_MODULE_PATH,
+};
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
@@ -23,6 +30,7 @@ use crate::util::{dialect_from_document_uri, send_server_status_notification, VE
 
 pub struct Server {
     documents: HashMap<String, String>,
+    // #todo also cache 'parsed/compiled' documents -> partial modules.
 }
 
 // #todo split further into methods.
@@ -182,6 +190,46 @@ impl Server {
                             //     selection_range: range,
                             //     children: None,
                             // };
+
+                            // #todo super hacky/experimental!
+
+                            let Some(document) =
+                                self.documents.get(params.text_document.uri.as_str())
+                            else {
+                                // #todo what should be done here?
+                                trace!("!!!!! should NOT happen?");
+                                continue;
+                            };
+
+                            // #todo starting a Context with prelude is expensive, cache it!
+
+                            let mut context = Context::without_prelude();
+                            let current_dir = std::env::current_dir()?.display().to_string();
+                            context
+                                .top_scope
+                                .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
+
+                            let scope = Arc::new(Scope::new(context.scope));
+                            context.scope = scope.clone();
+                            context.insert("koko32", Expr::None, false);
+                            let _ = eval_string(document, &mut context);
+
+                            // trace!("****>>> {:?}", document);
+
+                            trace!(
+                                "~~~~~>>> {:?}",
+                                scope.bindings.read().expect("poisoned").keys()
+                            );
+
+                            trace!(
+                                "~~+++~~~>>> {:?}",
+                                context.scope.bindings.read().expect("poisoned").keys()
+                            );
+
+                            trace!(
+                                "~~+*******++~~~>>> {:?}",
+                                context.get("sanitize-path", false)
+                            );
 
                             let location = Location {
                                 uri: params.text_document.uri,

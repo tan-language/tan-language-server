@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification;
+
+use tan::error::Error;
+use tan::expr::Expr;
 use tan_formatting::types::Dialect;
 
 use crossbeam::channel::SendError;
@@ -50,3 +53,8 @@ pub fn send_server_status_notification(
 
     Ok(())
 }
+
+// // #todo #temp move elsewhere!
+// pub fn eval_module_file() -> Result<Expr, Vec<Error>> {
+//     todo!()
+// }
