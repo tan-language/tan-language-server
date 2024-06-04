@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use lsp_server::{Connection, Message, Response};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
-    request::{Formatting, Request},
+    request::{DocumentSymbolRequest, Formatting, Request},
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams, OneOf,
     Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncKind, TextEdit,
     Uri,
@@ -15,6 +15,10 @@ use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
 use crate::util::{dialect_from_document_uri, send_server_status_notification, VERSION};
+
+// #insight
+// For debugging use trace! and similar functions, the traces are logged in the
+// `Tan Language` tab of the Output panel, in VS Code.
 
 pub struct Server {
     documents: HashMap<String, String>,
@@ -37,7 +41,8 @@ impl Server {
         let server_capabilities = serde_json::to_value(ServerCapabilities {
             // definition_provider: Some(OneOf::Left(true)),
             // references_provider: Some(OneOf::Left(true)),
-            // #Insight Enables didOpen/didChange notifications.
+            // #insight Enables didOpen/didChange notifications.
+            document_symbol_provider: Some(OneOf::Left(true)),
             text_document_sync: Some(lsp_types::TextDocumentSyncCapability::Kind(
                 TextDocumentSyncKind::FULL,
             )),
@@ -139,7 +144,11 @@ impl Server {
                     //     Err(ExtractError::MethodMismatch(req)) => req,
                     // };
 
+                    trace!(".......0");
                     match req.method.as_ref() {
+                        DocumentSymbolRequest::METHOD => {
+                            trace!("--->> DOCUMENT SYMBOL <<---");
+                        }
                         Formatting::METHOD => {
                             send_server_status_notification(&connection, "formatting")?;
 
@@ -207,6 +216,7 @@ impl Server {
                             }
                         }
                         "textDocument/didChange" => {
+                            // #todo #perf support incremental updates for formatting, documentSymbols, etc...
                             if let Ok(params) = notification.extract::<DidChangeTextDocumentParams>(
                                 DidChangeTextDocument::METHOD,
                             ) {
