@@ -7,7 +7,7 @@ use lsp_types::{
     request::{Formatting, Request},
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams, OneOf,
     Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncKind, TextEdit,
-    Url,
+    Uri,
 };
 use tan::api::parse_string_all;
 use tan_formatting::pretty::Formatter;
@@ -64,7 +64,7 @@ impl Server {
     }
 
     // #todo return a more precise result.
-    pub fn send_diagnostics(&self, connection: &Connection, uri: Url) -> anyhow::Result<()> {
+    pub fn send_diagnostics(&self, connection: &Connection, uri: Uri) -> anyhow::Result<()> {
         let Some(input) = self.documents.get(uri.as_str()) else {
             return Err(anyhow!("Unknown document").context("in send_diagnostics"));
         };

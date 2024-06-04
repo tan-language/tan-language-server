@@ -10,8 +10,8 @@ authors = ["George Moschovitis <gmosx@reizu.org>"]
 
 [dependencies]
 anyhow = "1"
-lsp-types = "0.95"
-lsp-server = "0.7"
+lsp-types = "0.96"
+lsp-server = "0.7"-
 clap = "4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
