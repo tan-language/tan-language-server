@@ -6,9 +6,9 @@ use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
     request::{DocumentSymbolRequest, Formatting, Request},
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
-    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, OneOf, Position,
-    PublishDiagnosticsParams, Range, ServerCapabilities, SymbolKind, TextDocumentSyncKind,
-    TextEdit, Uri,
+    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
+    TextDocumentSyncKind, TextEdit, Uri,
 };
 use tan::api::parse_string_all;
 use tan_formatting::pretty::Formatter;
@@ -152,7 +152,7 @@ impl Server {
                         DocumentSymbolRequest::METHOD => {
                             trace!("--->> DOCUMENT SYMBOL <<---");
 
-                            let (id, _params) =
+                            let (id, params) =
                                 req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
                             // let result = document_symbol_handler(&params);
                             // let response = Response::new_ok(req.id, result);
@@ -169,19 +169,46 @@ impl Server {
                             let end = Position::new(u32::MAX, u32::MAX);
                             let range = Range::new(start, end);
 
+                            // #todo for some reason, the Nested form was not working! investigate.
+                            // #[allow(deprecated)]
+                            // let _ds = DocumentSymbol {
+                            //     name: String::from("dummy"),
+                            //     detail: None,
+                            //     kind: SymbolKind::FUNCTION,
+                            //     tags: None,
+                            //     deprecated: None,
+                            //     range,
+                            //     selection_range: range,
+                            //     children: None,
+                            // };
+
+                            let location = Location {
+                                uri: params.text_document.uri,
+                                range,
+                            };
+
                             #[allow(deprecated)]
-                            let ds = DocumentSymbol {
+                            let info1 = SymbolInformation {
                                 name: String::from("dummy"),
-                                detail: None,
                                 kind: SymbolKind::FUNCTION,
                                 tags: None,
                                 deprecated: None,
-                                range,
-                                selection_range: range,
-                                children: None,
+                                location: location.clone(),
+                                container_name: None,
                             };
 
-                            let result = DocumentSymbolResponse::Nested(vec![ds]);
+                            #[allow(deprecated)]
+                            let info2 = SymbolInformation {
+                                name: String::from("another-one"),
+                                kind: SymbolKind::VARIABLE,
+                                tags: None,
+                                deprecated: None,
+                                location,
+                                container_name: None,
+                            };
+
+                            // let result = DocumentSymbolResponse::Nested(vec![ds]);
+                            let result = DocumentSymbolResponse::Flat(vec![info1, info2]);
                             let result =
                                 serde_json::to_value::<DocumentSymbolResponse>(result).unwrap();
                             let resp = Response {
