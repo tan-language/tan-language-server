@@ -170,6 +170,7 @@ impl Server {
                             let range = Range::new(start, end);
 
                             // #todo for some reason, the Nested form was not working! investigate.
+                            // #todo maybe we need to populate `children`?
                             // #[allow(deprecated)]
                             // let _ds = DocumentSymbol {
                             //     name: String::from("dummy"),
