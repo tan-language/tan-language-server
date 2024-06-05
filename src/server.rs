@@ -16,7 +16,7 @@ use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
 use crate::util::{
-    dialect_from_document_uri, lsp_range_from_tan_range, parse_module_file,
+    dialect_from_document_uri, lsp_range_from_tan_range, lsp_range_top, parse_module_file,
     send_server_status_notification, VERSION,
 };
 
@@ -159,6 +159,10 @@ impl Server {
                     match req.method.as_ref() {
                         // "textDocument/documentSymbol"
                         DocumentSymbolRequest::METHOD => {
+                            // #todo imports are problematic, tan function have wrong ranges, foreign functions have no ranges
+                            // #todo override range with the module-uri range
+                            // #todo what about the signatures? leave as is and fianlize the real signature, or even nest them.
+
                             let (id, params) =
                                 req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
                             // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
@@ -167,9 +171,9 @@ impl Server {
                             // #insight, actually Flat works just fine, Nested is too noisy.
 
                             // #todo this is a dummy range.
-                            let start = Position::new(0, 0);
-                            let end = Position::new(u32::MAX, u32::MAX);
-                            let dummy_range = Range::new(start, end);
+                            // let start = Position::new(0, 0);
+                            // let end = Position::new(u32::MAX, u32::MAX);
+                            // let dummy_range = Range::new(start, end);
 
                             // #todo for some reason, the Nested form was not working! investigate.
                             // #todo maybe we need to populate `children`?
@@ -210,7 +214,12 @@ impl Server {
                                 } else {
                                     // #todo extract whole document range helper.
                                     // #todo is this clause really needed?
-                                    dummy_range
+                                    // dummy_range
+
+                                    // #todo use imports don't have range.
+                                    // #todo temporary point to top of document.
+                                    // trace!("=====>>>>>>> {:?}", expr.annotations());
+                                    lsp_range_top()
                                 };
 
                                 let location = Location {
@@ -229,6 +238,9 @@ impl Server {
                                     "Func" => SymbolKind::FUNCTION,
                                     _ => SymbolKind::VARIABLE,
                                 };
+
+                                // #insight VS Code Outline automatically sorts by range.
+                                // #insight if a symbol range includes other symbol ranges, VS Code automatically nests.
 
                                 #[allow(deprecated)]
                                 infos.push(SymbolInformation {

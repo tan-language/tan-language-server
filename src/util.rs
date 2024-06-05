@@ -58,6 +58,19 @@ pub fn send_server_status_notification(
     Ok(())
 }
 
+pub fn lsp_range_top() -> lsp_types::Range {
+    let start = lsp_types::Position::new(0, 0);
+    // let end = lsp_types::Position::new(u32::MAX, u32::MAX);
+    lsp_types::Range::new(start, start)
+}
+
+#[allow(dead_code)]
+pub fn lsp_range_whole_document() -> lsp_types::Range {
+    let start = lsp_types::Position::new(0, 0);
+    let end = lsp_types::Position::new(u32::MAX, u32::MAX);
+    lsp_types::Range::new(start, end)
+}
+
 // #todo move this helper to tan-analysis
 pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Range {
     let start = lsp_types::Position {
@@ -135,6 +148,7 @@ mod tests {
 
         let scope = parse_module_file(input, &mut context).unwrap();
         // dbg!(&scope);
+        // dbg!(scope.get("rng/random").unwrap().annotations());
         let bindings = scope.bindings.read().expect("not poisoned");
         let symbols: Vec<String> = bindings.keys().cloned().collect();
         assert!(symbols.contains(&String::from("rng/random")));
