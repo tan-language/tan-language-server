@@ -164,14 +164,8 @@ impl Server {
                             let (id, params) =
                                 req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
                             // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
-                            // #todo let's go for Nested!
 
                             // #insight, actually Flat works just fine, Nested is too noisy.
-
-                            // #todo this is a dummy range.
-                            // let start = Position::new(0, 0);
-                            // let end = Position::new(u32::MAX, u32::MAX);
-                            // let dummy_range = Range::new(start, end);
 
                             // #todo for some reason, the Nested form was not working! investigate.
                             // #todo maybe we need to populate `children`?
@@ -187,7 +181,6 @@ impl Server {
                             //     children: None,
                             // };
 
-                            // #todo super hacky/experimental!
                             // #todo cache the parsing between documentSymbol, formatting, linting etc!
 
                             let Some(document) =
@@ -203,20 +196,13 @@ impl Server {
 
                             let mut infos: Vec<SymbolInformation> = Vec::new();
 
-                            // #todo make sure the symbols are returned in the source order!
-                            // #todo could even sort by range, or make the scope binding preserve order.
+                            // #insight VS Code automatically sorts the documentSymbols in source/range order.
 
                             for (name, expr) in bindings.iter() {
                                 let range = if let Some(tan_range) = expr.range() {
                                     lsp_range_from_tan_range(tan_range)
                                 } else {
-                                    // #todo extract whole document range helper.
                                     // #todo is this clause really needed?
-                                    // dummy_range
-
-                                    // #todo use imports don't have range.
-                                    // #todo temporary point to top of document.
-                                    // trace!("=====>>>>>>> {:?}", expr.annotations());
                                     lsp_range_top()
                                 };
 
@@ -253,6 +239,7 @@ impl Server {
 
                             // #todo maybe it needs children array populated?
                             // let result = DocumentSymbolResponse::Nested(vec![ds]);
+
                             let result = DocumentSymbolResponse::Flat(infos);
                             let result =
                                 serde_json::to_value::<DocumentSymbolResponse>(result).unwrap();
