@@ -75,19 +75,19 @@ pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Rang
 
 // #todo probably not required.
 // #todo find a better name.
-pub fn make_context_for_parsing() -> Result<Context, std::io::Error> {
-    let context = Context::without_prelude();
+// pub fn make_context_for_parsing() -> Result<Context, std::io::Error> {
+//     let context = Context::without_prelude();
 
-    // #todo prepare context out of this!
+//     // #todo prepare context out of this!
 
-    let current_dir = std::env::current_dir()?.display().to_string();
+//     let current_dir = std::env::current_dir()?.display().to_string();
 
-    context
-        .top_scope
-        .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
+//     context
+//         .top_scope
+//         .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
 
-    Ok(context)
-}
+//     Ok(context)
+// }
 
 // #todo #temp move elsewhere!
 // #todo find a better name.
