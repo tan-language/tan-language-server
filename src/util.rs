@@ -8,9 +8,7 @@ use lsp_types::notification::Notification;
 use tan::api::eval_string;
 use tan::context::Context;
 use tan::error::Error;
-use tan::expr::Expr;
 use tan::scope::Scope;
-use tan::util::standard_names::CURRENT_MODULE_PATH;
 use tan_formatting::types::Dialect;
 
 use crossbeam::channel::SendError;
@@ -102,11 +100,13 @@ pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope
 
 #[cfg(test)]
 mod tests {
-    use crate::util::{make_context_for_parsing, parse_module_file};
+    use tan::context::Context;
+
+    use crate::util::parse_module_file;
 
     #[test]
     fn parse_module_file_usage() {
-        let mut context = make_context_for_parsing().unwrap();
+        let mut context = Context::new();
 
         // #todo #fix (`use` fucks-up the scope!!!)
         // #todo add unit-test for `use`
@@ -124,5 +124,23 @@ mod tests {
         assert!(symbols.contains(&String::from("a")));
         assert!(symbols.contains(&String::from("b")));
         assert!(symbols.contains(&String::from("zonk")));
+
+        // #todo check case where use URI is invalid!
+
+        let input = r#"
+        (use /rng)
+        (let b 2)
+        (let zonk (Func [x y] (+ x y)))
+        "#;
+
+        let scope = parse_module_file(input, &mut context).unwrap();
+        // dbg!(&scope);
+        let bindings = scope.bindings.read().expect("not poisoned");
+        let symbols: Vec<String> = bindings.keys().cloned().collect();
+        assert!(symbols.contains(&String::from("rng/random")));
+        assert!(symbols.contains(&String::from("b")));
+        assert!(symbols.contains(&String::from("zonk")));
+
+        // #todo check with function call.
     }
 }
