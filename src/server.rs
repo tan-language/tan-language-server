@@ -163,6 +163,8 @@ impl Server {
                             // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
                             // #todo let's go for Nested!
 
+                            // #insight, actually Flat works just fine, Nested is too noisy.
+
                             // #todo this is a dummy range.
                             let start = Position::new(0, 0);
                             let end = Position::new(u32::MAX, u32::MAX);
@@ -183,6 +185,7 @@ impl Server {
                             // };
 
                             // #todo super hacky/experimental!
+                            // #todo cache the parsing between documentSymbol, formatting, linting etc!
 
                             let Some(document) =
                                 self.documents.get(params.text_document.uri.as_str())
