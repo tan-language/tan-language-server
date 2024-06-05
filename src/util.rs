@@ -77,7 +77,11 @@ pub fn make_context_for_parsing() -> Result<Context, std::io::Error> {
 
 // #todo #temp move elsewhere!
 // #todo find a better name.
+// #todo return the binding in more useful/processed format
+// #todo use a fully initialized context.
 pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope>, Vec<Error>> {
+    // #todo implement some context nesting helpers.
+    context.scope = Arc::new(Scope::new(context.scope.clone()));
     let _ = eval_string(input, context);
     Ok(context.scope.clone())
 }
@@ -89,6 +93,10 @@ mod tests {
     #[test]
     fn parse_module_file_usage() {
         let mut context = make_context_for_parsing().unwrap();
+
+        // #todo #fix (`use` fucks-up the scope!!!)
+        // #todo add unit-test for `use`
+        // #todo also function invocation seems to fuck-up the scope.
 
         let input = r#"
         (let a 1)

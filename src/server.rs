@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use anyhow::anyhow;
 use lsp_server::{Connection, Message, Response};
@@ -10,19 +10,15 @@ use lsp_types::{
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::{
-    api::{eval_string, parse_string_all},
-    context::Context,
-    eval::util::eval_file,
-    expr::Expr,
-    scope::Scope,
-    util::standard_names::CURRENT_MODULE_PATH,
-};
+use tan::api::parse_string_all;
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
-use crate::util::{dialect_from_document_uri, send_server_status_notification, VERSION};
+use crate::util::{
+    dialect_from_document_uri, make_context_for_parsing, parse_module_file,
+    send_server_status_notification, VERSION,
+};
 
 // #insight
 // For debugging use trace! and similar functions, the traces are logged in the
@@ -111,6 +107,10 @@ impl Server {
         // #todo use params to get root_uri and perform initial diagnostics for all files.
         // let params: InitializeParams = serde_json::from_value(params).unwrap();
         // eprintln!("{params:#?}");
+
+        // #insight cache the analysis context.
+        // #todo make a fully working context!
+        let mut analysis_context = make_context_for_parsing().unwrap();
 
         for msg in &connection.receiver {
             trace!("Got msg: {:?}.", msg);
@@ -201,35 +201,12 @@ impl Server {
                                 continue;
                             };
 
-                            // #todo starting a Context with prelude is expensive, cache it!
+                            // let mut analysis_context = make_context_for_parsing().unwrap();
+                            let scope = parse_module_file(document, &mut analysis_context).unwrap();
+                            let bindings = scope.bindings.read().expect("not poisoned");
+                            let symbols: Vec<String> = bindings.keys().cloned().collect();
 
-                            let mut context = Context::without_prelude();
-                            let current_dir = std::env::current_dir()?.display().to_string();
-                            context
-                                .top_scope
-                                .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
-
-                            let scope = Arc::new(Scope::new(context.scope));
-                            context.scope = scope.clone();
-                            context.insert("koko32", Expr::None, false);
-                            let _ = eval_string(document, &mut context);
-
-                            // trace!("****>>> {:?}", document);
-
-                            trace!(
-                                "~~~~~>>> {:?}",
-                                scope.bindings.read().expect("poisoned").keys()
-                            );
-
-                            trace!(
-                                "~~+++~~~>>> {:?}",
-                                context.scope.bindings.read().expect("poisoned").keys()
-                            );
-
-                            trace!(
-                                "~~+*******++~~~>>> {:?}",
-                                context.get("sanitize-path", false)
-                            );
+                            // trace!("~~+++~~~>>> {:?}", symbols);
 
                             let location = Location {
                                 uri: params.text_document.uri,
@@ -237,27 +214,21 @@ impl Server {
                             };
 
                             #[allow(deprecated)]
-                            let info1 = SymbolInformation {
-                                name: String::from("dummy"),
-                                kind: SymbolKind::FUNCTION,
-                                tags: None,
-                                deprecated: None,
-                                location: location.clone(),
-                                container_name: None,
-                            };
+                            let infos = symbols
+                                .iter()
+                                .map(|s| SymbolInformation {
+                                    name: s.clone(),
+                                    kind: SymbolKind::FUNCTION,
+                                    tags: None,
+                                    deprecated: None,
+                                    location: location.clone(),
+                                    container_name: None,
+                                })
+                                .collect();
 
-                            #[allow(deprecated)]
-                            let info2 = SymbolInformation {
-                                name: String::from("another-one"),
-                                kind: SymbolKind::VARIABLE,
-                                tags: None,
-                                deprecated: None,
-                                location,
-                                container_name: None,
-                            };
-
+                            // #todo maybe it needs children array populated?
                             // let result = DocumentSymbolResponse::Nested(vec![ds]);
-                            let result = DocumentSymbolResponse::Flat(vec![info1, info2]);
+                            let result = DocumentSymbolResponse::Flat(infos);
                             let result =
                                 serde_json::to_value::<DocumentSymbolResponse>(result).unwrap();
                             let resp = Response {
