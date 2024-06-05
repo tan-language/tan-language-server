@@ -10,7 +10,7 @@ use lsp_types::{
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::api::parse_string_all;
+use tan::{api::parse_string_all, expr::Expr};
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
@@ -197,6 +197,9 @@ impl Server {
 
                             let mut infos: Vec<SymbolInformation> = Vec::new();
 
+                            // #todo make sure the symbols are returned in the source order!
+                            // #todo could even sort by range, or make the scope binding preserve order.
+
                             for (name, expr) in bindings.iter() {
                                 let range = if let Some(tan_range) = expr.range() {
                                     lsp_range_from_tan_range(tan_range)
@@ -211,10 +214,22 @@ impl Server {
                                     range,
                                 };
 
+                                let Expr::Type(typ) = expr.dyn_type(&analysis_context) else {
+                                    // #todo should never happen.
+                                    // #todo dyn_type has not a convenient interface here.
+                                    panic!("cannot infere dynamic type");
+                                };
+
+                                let kind = match typ.as_str() {
+                                    // #todo add more variants here!
+                                    "Func" => SymbolKind::FUNCTION,
+                                    _ => SymbolKind::VARIABLE,
+                                };
+
                                 #[allow(deprecated)]
                                 infos.push(SymbolInformation {
                                     name: name.clone(),
-                                    kind: SymbolKind::FUNCTION,
+                                    kind,
                                     tags: None,
                                     deprecated: None,
                                     location: location.clone(),
