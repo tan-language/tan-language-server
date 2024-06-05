@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification;
 
-use tan::api::eval_string;
+use tan::api::compile_string;
 use tan::context::Context;
 use tan::error::Error;
 use tan::expr::Expr;
@@ -108,8 +108,30 @@ pub fn make_analysis_context() -> Result<Context, std::io::Error> {
 pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope>, Vec<Error>> {
     // #todo implement some context nesting helpers.
     context.scope = Arc::new(Scope::new(context.scope.clone()));
+
     // #todo #IMPORTANT I think eval is _not_ really needed! maybe just compile!
-    let _ = eval_string(input, context);
+    // let _ = eval_string(input, context);
+
+    let exprs = compile_string(input, context)?;
+
+    // #insight only process top-level `let` definitions.
+    // #insight ignore problematic `use` imports.
+
+    // #todo implement a formalized method for custom evaluators like the following.
+
+    for expr in exprs {
+        if let Some(terms) = expr.as_list() {
+            if let Some(op) = terms.first() {
+                if let Some(sym) = op.as_symbol() {
+                    if sym == "let" {
+                        // #todo what to do about the error case here?
+                        let _ = tan::eval::eval_let::eval_let(op, &terms[1..], context);
+                    }
+                }
+            }
+        }
+    }
+
     Ok(context.scope.clone())
 }
 
@@ -122,8 +144,6 @@ mod tests {
     #[test]
     fn parse_module_file_usage() {
         let mut context = Context::new();
-
-        // #todo also function invocation seems to fuck-up the scope.
 
         let input = r#"
         (let a 1)
@@ -147,11 +167,10 @@ mod tests {
         "#;
 
         let scope = parse_module_file(input, &mut context).unwrap();
-        // dbg!(&scope);
-        // dbg!(scope.get("rng/random").unwrap().annotations());
         let bindings = scope.bindings.read().expect("not poisoned");
         let symbols: Vec<String> = bindings.keys().cloned().collect();
-        assert!(symbols.contains(&String::from("rng/random")));
+        // #insight we ignore `use` imports
+        // assert!(symbols.contains(&String::from("rng/random")));
         assert!(symbols.contains(&String::from("b")));
         assert!(symbols.contains(&String::from("zonk")));
 
@@ -163,7 +182,6 @@ mod tests {
         "#;
 
         let scope = parse_module_file(input, &mut context).unwrap();
-        // dbg!(&scope);
         let bindings = scope.bindings.read().expect("not poisoned");
         let symbols: Vec<String> = bindings.keys().cloned().collect();
         assert!(symbols.contains(&String::from("z")));
