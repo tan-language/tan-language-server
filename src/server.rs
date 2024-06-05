@@ -158,17 +158,8 @@ impl Server {
                     match req.method.as_ref() {
                         // "textDocument/documentSymbol"
                         DocumentSymbolRequest::METHOD => {
-                            trace!("--->> DOCUMENT SYMBOL <<---");
-
                             let (id, params) =
                                 req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
-                            // let result = document_symbol_handler(&params);
-                            // let response = Response::new_ok(req.id, result);
-                            // connection.sender.send(response.into()).unwrap();
-                            // let result = S
-
-                            // let result = Some(vec![TextEdit::new(document_range, formatted)]);
-
                             // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
                             // #todo let's go for Nested!
 
@@ -201,7 +192,6 @@ impl Server {
                                 continue;
                             };
 
-                            // let mut analysis_context = make_context_for_parsing().unwrap();
                             let scope = parse_module_file(document, &mut analysis_context).unwrap();
                             let bindings = scope.bindings.read().expect("not poisoned");
                             let symbols: Vec<String> = bindings.keys().cloned().collect();
