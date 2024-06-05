@@ -1,7 +1,14 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification;
+
+use tan::api::eval_string;
+use tan::context::Context;
+use tan::error::Error;
+use tan::scope::Scope;
 use tan_formatting::types::Dialect;
 
 use crossbeam::channel::SendError;
@@ -49,4 +56,106 @@ pub fn send_server_status_notification(
         .send(Message::Notification(notification))?;
 
     Ok(())
+}
+
+pub fn lsp_range_top() -> lsp_types::Range {
+    let start = lsp_types::Position::new(0, 0);
+    // let end = lsp_types::Position::new(u32::MAX, u32::MAX);
+    lsp_types::Range::new(start, start)
+}
+
+#[allow(dead_code)]
+pub fn lsp_range_whole_document() -> lsp_types::Range {
+    let start = lsp_types::Position::new(0, 0);
+    let end = lsp_types::Position::new(u32::MAX, u32::MAX);
+    lsp_types::Range::new(start, end)
+}
+
+// #todo move this helper to tan-analysis
+pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Range {
+    let start = lsp_types::Position {
+        line: tan_range.start.line as u32,
+        character: tan_range.start.col as u32,
+    };
+    let end = lsp_types::Position {
+        line: tan_range.end.line as u32,
+        character: tan_range.end.col as u32,
+    };
+    lsp_types::Range { start, end }
+}
+
+// #todo probably not required.
+// #todo find a better name.
+// pub fn make_context_for_parsing() -> Result<Context, std::io::Error> {
+//     let context = Context::without_prelude();
+
+//     // #todo prepare context out of this!
+
+//     let current_dir = std::env::current_dir()?.display().to_string();
+
+//     context
+//         .top_scope
+//         .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
+
+//     Ok(context)
+// }
+
+// #todo #temp move elsewhere!
+// #todo find a better name.
+// #todo return the binding in more useful/processed format
+// #todo use a fully initialized context.
+pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope>, Vec<Error>> {
+    // #todo implement some context nesting helpers.
+    context.scope = Arc::new(Scope::new(context.scope.clone()));
+    // #todo #IMPORTANT I think eval is _not_ really needed! maybe just compile!
+    let _ = eval_string(input, context);
+    Ok(context.scope.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use tan::context::Context;
+
+    use crate::util::parse_module_file;
+
+    #[test]
+    fn parse_module_file_usage() {
+        let mut context = Context::new();
+
+        // #todo #fix (`use` fucks-up the scope!!!)
+        // #todo add unit-test for `use`
+        // #todo also function invocation seems to fuck-up the scope.
+
+        let input = r#"
+        (let a 1)
+        (let b 2)
+        (let zonk (Func [a b] (+ a b)))
+        "#;
+
+        let scope = parse_module_file(input, &mut context).unwrap();
+        let bindings = scope.bindings.read().expect("not poisoned");
+        let symbols: Vec<String> = bindings.keys().cloned().collect();
+        assert!(symbols.contains(&String::from("a")));
+        assert!(symbols.contains(&String::from("b")));
+        assert!(symbols.contains(&String::from("zonk")));
+
+        // #todo check case where use URI is invalid!
+
+        let input = r#"
+        (use /rng)
+        (let b 2)
+        (let zonk (Func [x y] (+ x y)))
+        "#;
+
+        let scope = parse_module_file(input, &mut context).unwrap();
+        // dbg!(&scope);
+        // dbg!(scope.get("rng/random").unwrap().annotations());
+        let bindings = scope.bindings.read().expect("not poisoned");
+        let symbols: Vec<String> = bindings.keys().cloned().collect();
+        assert!(symbols.contains(&String::from("rng/random")));
+        assert!(symbols.contains(&String::from("b")));
+        assert!(symbols.contains(&String::from("zonk")));
+
+        // #todo check with function call.
+    }
 }

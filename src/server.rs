@@ -6,16 +6,19 @@ use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification, PublishDiagnostics},
     request::{DocumentSymbolRequest, Formatting, Request},
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
-    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
+    DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::api::parse_string_all;
+use tan::{api::parse_string_all, context::Context, expr::Expr};
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
-use crate::util::{dialect_from_document_uri, send_server_status_notification, VERSION};
+use crate::util::{
+    dialect_from_document_uri, lsp_range_from_tan_range, lsp_range_top, parse_module_file,
+    send_server_status_notification, VERSION,
+};
 
 // #insight
 // For debugging use trace! and similar functions, the traces are logged in the
@@ -23,6 +26,7 @@ use crate::util::{dialect_from_document_uri, send_server_status_notification, VE
 
 pub struct Server {
     documents: HashMap<String, String>,
+    // #todo also cache 'parsed/compiled' documents -> partial modules.
 }
 
 // #todo split further into methods.
@@ -104,6 +108,11 @@ impl Server {
         // let params: InitializeParams = serde_json::from_value(params).unwrap();
         // eprintln!("{params:#?}");
 
+        // #insight cache the analysis context.
+        // #todo make a fully working context!
+        // let mut analysis_context = make_context_for_parsing().unwrap();
+        let mut analysis_context = Context::new();
+
         for msg in &connection.receiver {
             trace!("Got msg: {:?}.", msg);
             match msg {
@@ -150,24 +159,21 @@ impl Server {
                     match req.method.as_ref() {
                         // "textDocument/documentSymbol"
                         DocumentSymbolRequest::METHOD => {
-                            trace!("--->> DOCUMENT SYMBOL <<---");
+                            // #todo imports are problematic, tan function have wrong ranges, foreign functions have no ranges
+                            // #todo override range with the module-uri range
+                            // #todo what about the signatures? leave as is and fianlize the real signature, or even nest them.
 
                             let (id, params) =
                                 req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
-                            // let result = document_symbol_handler(&params);
-                            // let response = Response::new_ok(req.id, result);
-                            // connection.sender.send(response.into()).unwrap();
-                            // let result = S
-
-                            // let result = Some(vec![TextEdit::new(document_range, formatted)]);
-
                             // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
                             // #todo let's go for Nested!
 
+                            // #insight, actually Flat works just fine, Nested is too noisy.
+
                             // #todo this is a dummy range.
-                            let start = Position::new(0, 0);
-                            let end = Position::new(u32::MAX, u32::MAX);
-                            let range = Range::new(start, end);
+                            // let start = Position::new(0, 0);
+                            // let end = Position::new(u32::MAX, u32::MAX);
+                            // let dummy_range = Range::new(start, end);
 
                             // #todo for some reason, the Nested form was not working! investigate.
                             // #todo maybe we need to populate `children`?
@@ -183,33 +189,73 @@ impl Server {
                             //     children: None,
                             // };
 
-                            let location = Location {
-                                uri: params.text_document.uri,
-                                range,
+                            // #todo super hacky/experimental!
+                            // #todo cache the parsing between documentSymbol, formatting, linting etc!
+
+                            let Some(document) =
+                                self.documents.get(params.text_document.uri.as_str())
+                            else {
+                                // #todo what should be done here?
+                                trace!("!!!!! should NOT happen?");
+                                continue;
                             };
 
-                            #[allow(deprecated)]
-                            let info1 = SymbolInformation {
-                                name: String::from("dummy"),
-                                kind: SymbolKind::FUNCTION,
-                                tags: None,
-                                deprecated: None,
-                                location: location.clone(),
-                                container_name: None,
-                            };
+                            let scope = parse_module_file(document, &mut analysis_context).unwrap();
+                            let bindings = scope.bindings.read().expect("not poisoned");
 
-                            #[allow(deprecated)]
-                            let info2 = SymbolInformation {
-                                name: String::from("another-one"),
-                                kind: SymbolKind::VARIABLE,
-                                tags: None,
-                                deprecated: None,
-                                location,
-                                container_name: None,
-                            };
+                            let mut infos: Vec<SymbolInformation> = Vec::new();
 
+                            // #todo make sure the symbols are returned in the source order!
+                            // #todo could even sort by range, or make the scope binding preserve order.
+
+                            for (name, expr) in bindings.iter() {
+                                let range = if let Some(tan_range) = expr.range() {
+                                    lsp_range_from_tan_range(tan_range)
+                                } else {
+                                    // #todo extract whole document range helper.
+                                    // #todo is this clause really needed?
+                                    // dummy_range
+
+                                    // #todo use imports don't have range.
+                                    // #todo temporary point to top of document.
+                                    // trace!("=====>>>>>>> {:?}", expr.annotations());
+                                    lsp_range_top()
+                                };
+
+                                let location = Location {
+                                    uri: params.text_document.uri.clone(),
+                                    range,
+                                };
+
+                                let Expr::Type(typ) = expr.dyn_type(&analysis_context) else {
+                                    // #todo should never happen.
+                                    // #todo dyn_type has not a convenient interface here.
+                                    panic!("cannot infere dynamic type");
+                                };
+
+                                let kind = match typ.as_str() {
+                                    // #todo add more variants here!
+                                    "Func" => SymbolKind::FUNCTION,
+                                    _ => SymbolKind::VARIABLE,
+                                };
+
+                                // #insight VS Code Outline automatically sorts by range.
+                                // #insight if a symbol range includes other symbol ranges, VS Code automatically nests.
+
+                                #[allow(deprecated)]
+                                infos.push(SymbolInformation {
+                                    name: name.clone(),
+                                    kind,
+                                    tags: None,
+                                    deprecated: None,
+                                    location: location.clone(),
+                                    container_name: None,
+                                });
+                            }
+
+                            // #todo maybe it needs children array populated?
                             // let result = DocumentSymbolResponse::Nested(vec![ds]);
-                            let result = DocumentSymbolResponse::Flat(vec![info1, info2]);
+                            let result = DocumentSymbolResponse::Flat(infos);
                             let result =
                                 serde_json::to_value::<DocumentSymbolResponse>(result).unwrap();
                             let resp = Response {
@@ -246,6 +292,7 @@ impl Server {
 
                             // #todo does it make sense to compute diffs?
 
+                            // #todo extract as helper!
                             // Select the whole document for replacement
                             let start = Position::new(0, 0);
                             let end = Position::new(u32::MAX, u32::MAX);
