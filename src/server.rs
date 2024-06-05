@@ -194,16 +194,15 @@ impl Server {
 
                             // #todo cache the parsing between documentSymbol, formatting, linting etc!
 
-                            let Some(document) =
-                                self.documents.get(params.text_document.uri.as_str())
+                            let Some(Ok(exprs)) =
+                                self.parsed_documents.get(params.text_document.uri.as_str())
                             else {
                                 // #todo what should be done here?
                                 trace!("!!!!! should NOT happen?");
                                 continue;
                             };
 
-                            let Ok(scope) = parse_module_file(document, &mut analysis_context)
-                            else {
+                            let Ok(scope) = parse_module_file(exprs, &mut analysis_context) else {
                                 // #todo what to do here?
                                 continue;
                             };

@@ -5,10 +5,11 @@ use serde::{Deserialize, Serialize};
 use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification;
 
-use tan::api::compile_string;
+use tan::api::compile;
 use tan::context::Context;
 use tan::error::Error;
-use tan::expr::Expr;
+use tan::eval::eval;
+use tan::expr::{expr_clone, Expr};
 use tan::scope::Scope;
 use tan::util::standard_names::CURRENT_MODULE_PATH;
 use tan_formatting::types::Dialect;
@@ -105,14 +106,28 @@ pub fn make_analysis_context() -> Result<Context, std::io::Error> {
 // #todo find a better name.
 // #todo return the binding in more useful/processed format
 // #todo use a fully initialized context.
-pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope>, Vec<Error>> {
+pub fn parse_module_file(exprs: &[Expr], context: &mut Context) -> Result<Arc<Scope>, Vec<Error>> {
     // #todo implement some context nesting helpers.
     context.scope = Arc::new(Scope::new(context.scope.clone()));
 
     // #todo #IMPORTANT I think eval is _not_ really needed! maybe just compile!
     // let _ = eval_string(input, context);
 
-    let exprs = compile_string(input, context)?;
+    // let exprs = compile_exprs(exprs, context)?;
+
+    // let mut compiled_exprs = Vec::new();
+
+    // for expr in exprs {
+    //     // #todo only compile the let expressions?
+    //     // #todo why do we need this compile? seems that the function def is not handled.
+    //     // #todo #IMPORTANT remove this fucking clone!
+    //     let expr = compile(expr_clone(expr), context)?;
+    //     if !expr.is_none() {
+    //         compiled_exprs.push(expr);
+    //     }
+    // }
+
+    // let compiled_exprs = exprs;
 
     // #insight only process top-level `let` definitions.
     // #insight ignore problematic `use` imports.
@@ -124,8 +139,12 @@ pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope
             if let Some(op) = terms.first() {
                 if let Some(sym) = op.as_symbol() {
                     if sym == "let" {
+                        // #todo why do we need this compile? seems that the function def is not handled.
+                        // #todo #IMPORTANT remove this fucking clone!
+                        let expr = compile(expr_clone(expr), context)?;
                         // #todo what to do about the error case here?
-                        let _ = tan::eval::eval_let::eval_let(op, &terms[1..], context);
+                        // let _ = tan::eval::eval_let::eval_let(op, &terms[1..], context);
+                        let _ = eval(&expr, context);
                     }
                 }
             }
@@ -137,7 +156,7 @@ pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope
 
 #[cfg(test)]
 mod tests {
-    use tan::context::Context;
+    use tan::{api::parse_string_all, context::Context};
 
     use crate::util::parse_module_file;
 
@@ -151,7 +170,8 @@ mod tests {
         (let zonk (Func [a b] (+ a b)))
         "#;
 
-        let scope = parse_module_file(input, &mut context).unwrap();
+        let exprs = parse_string_all(input).unwrap();
+        let scope = parse_module_file(&exprs, &mut context).unwrap();
         let bindings = scope.bindings.read().expect("not poisoned");
         let symbols: Vec<String> = bindings.keys().cloned().collect();
         assert!(symbols.contains(&String::from("a")));
@@ -166,7 +186,8 @@ mod tests {
         (let zonk (Func [x y] (+ x y)))
         "#;
 
-        let scope = parse_module_file(input, &mut context).unwrap();
+        let exprs = parse_string_all(input).unwrap();
+        let scope = parse_module_file(&exprs, &mut context).unwrap();
         let bindings = scope.bindings.read().expect("not poisoned");
         let symbols: Vec<String> = bindings.keys().cloned().collect();
         // #insight we ignore `use` imports
@@ -181,7 +202,8 @@ mod tests {
         (let a 1)
         "#;
 
-        let scope = parse_module_file(input, &mut context).unwrap();
+        let exprs = parse_string_all(input).unwrap();
+        let scope = parse_module_file(&exprs, &mut context).unwrap();
         let bindings = scope.bindings.read().expect("not poisoned");
         let symbols: Vec<String> = bindings.keys().cloned().collect();
         assert!(symbols.contains(&String::from("z")));
