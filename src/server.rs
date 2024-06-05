@@ -8,9 +8,9 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
     DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
-    TextDocumentSyncKind, TextEdit, Uri,
+    TextDocumentItem, TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::{api::parse_string_all, expr::Expr};
+use tan::{api::parse_string_all, error::Error, expr::Expr};
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
@@ -26,6 +26,7 @@ use crate::util::{
 
 pub struct Server {
     documents: HashMap<String, String>,
+    parsed_documents: HashMap<String, Result<Vec<Expr>, Vec<Error>>>,
     // #todo also cache 'parsed/compiled' documents -> partial modules.
 }
 
@@ -35,6 +36,7 @@ impl Server {
     pub fn new() -> Self {
         Self {
             documents: HashMap::default(),
+            parsed_documents: HashMap::default(),
         }
     }
 
@@ -71,6 +73,15 @@ impl Server {
         info!("Shutting down server...");
 
         Ok(())
+    }
+
+    // #todo find a good name.
+    pub fn process_document(&mut self, uri: &Uri, text: &str) {
+        let input = text.to_string();
+        let uri = uri.to_string();
+        let exprs = parse_string_all(&input);
+        self.parsed_documents.insert(uri.clone(), exprs);
+        self.documents.insert(uri, input);
     }
 
     // #todo return a more precise result.
@@ -191,7 +202,11 @@ impl Server {
                                 continue;
                             };
 
-                            let scope = parse_module_file(document, &mut analysis_context).unwrap();
+                            let Ok(scope) = parse_module_file(document, &mut analysis_context)
+                            else {
+                                // #todo what to do here?
+                                continue;
+                            };
                             let bindings = scope.bindings.read().expect("not poisoned");
 
                             let mut infos: Vec<SymbolInformation> = Vec::new();
@@ -312,8 +327,9 @@ impl Server {
                                 .extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
                             {
                                 let document = params.text_document;
-                                self.documents
-                                    .insert(document.uri.to_string(), document.text);
+                                self.process_document(&document.uri, &document.text);
+                                // self.documents
+                                //     .insert(document.uri.to_string(), document.text);
                                 self.send_diagnostics(&connection, document.uri)?;
                             }
                         }
