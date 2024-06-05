@@ -122,8 +122,6 @@ mod tests {
     fn parse_module_file_usage() {
         let mut context = Context::new();
 
-        // #todo #fix (`use` fucks-up the scope!!!)
-        // #todo add unit-test for `use`
         // #todo also function invocation seems to fuck-up the scope.
 
         let input = r#"
@@ -156,6 +154,17 @@ mod tests {
         assert!(symbols.contains(&String::from("b")));
         assert!(symbols.contains(&String::from("zonk")));
 
-        // #todo check with function call.
+        let input = r#"
+        (let b 2)
+        (let zonk (Func [x y] (+ x y)))
+        (let z (zonk b 4))
+        (let a 1)
+        "#;
+
+        let scope = parse_module_file(input, &mut context).unwrap();
+        // dbg!(&scope);
+        let bindings = scope.bindings.read().expect("not poisoned");
+        let symbols: Vec<String> = bindings.keys().cloned().collect();
+        assert!(symbols.contains(&String::from("z")));
     }
 }
