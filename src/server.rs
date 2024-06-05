@@ -16,8 +16,8 @@ use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
 use crate::util::{
-    dialect_from_document_uri, make_context_for_parsing, parse_module_file,
-    send_server_status_notification, VERSION,
+    dialect_from_document_uri, lsp_range_from_tan_range, make_context_for_parsing,
+    parse_module_file, send_server_status_notification, VERSION,
 };
 
 // #insight
@@ -166,7 +166,7 @@ impl Server {
                             // #todo this is a dummy range.
                             let start = Position::new(0, 0);
                             let end = Position::new(u32::MAX, u32::MAX);
-                            let range = Range::new(start, end);
+                            let dummy_range = Range::new(start, end);
 
                             // #todo for some reason, the Nested form was not working! investigate.
                             // #todo maybe we need to populate `children`?
@@ -194,27 +194,33 @@ impl Server {
 
                             let scope = parse_module_file(document, &mut analysis_context).unwrap();
                             let bindings = scope.bindings.read().expect("not poisoned");
-                            let symbols: Vec<String> = bindings.keys().cloned().collect();
 
-                            // trace!("~~+++~~~>>> {:?}", symbols);
+                            let mut infos: Vec<SymbolInformation> = Vec::new();
 
-                            let location = Location {
-                                uri: params.text_document.uri,
-                                range,
-                            };
+                            for (name, expr) in bindings.iter() {
+                                let range = if let Some(tan_range) = expr.range() {
+                                    lsp_range_from_tan_range(tan_range)
+                                } else {
+                                    // #todo extract whole document range helper.
+                                    // #todo is this clause really needed?
+                                    dummy_range
+                                };
 
-                            #[allow(deprecated)]
-                            let infos = symbols
-                                .iter()
-                                .map(|s| SymbolInformation {
-                                    name: s.clone(),
+                                let location = Location {
+                                    uri: params.text_document.uri.clone(),
+                                    range,
+                                };
+
+                                #[allow(deprecated)]
+                                infos.push(SymbolInformation {
+                                    name: name.clone(),
                                     kind: SymbolKind::FUNCTION,
                                     tags: None,
                                     deprecated: None,
                                     location: location.clone(),
                                     container_name: None,
-                                })
-                                .collect();
+                                });
+                            }
 
                             // #todo maybe it needs children array populated?
                             // let result = DocumentSymbolResponse::Nested(vec![ds]);
@@ -255,6 +261,7 @@ impl Server {
 
                             // #todo does it make sense to compute diffs?
 
+                            // #todo extract as helper!
                             // Select the whole document for replacement
                             let start = Position::new(0, 0);
                             let end = Position::new(u32::MAX, u32::MAX);

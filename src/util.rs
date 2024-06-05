@@ -60,6 +60,20 @@ pub fn send_server_status_notification(
     Ok(())
 }
 
+// #todo move this helper to tan-analysis
+pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Range {
+    let start = lsp_types::Position {
+        line: tan_range.start.line as u32,
+        character: tan_range.start.col as u32,
+    };
+    let end = lsp_types::Position {
+        line: tan_range.end.line as u32,
+        character: tan_range.end.col as u32,
+    };
+    lsp_types::Range { start, end }
+}
+
+// #todo probably not required.
 // #todo find a better name.
 pub fn make_context_for_parsing() -> Result<Context, std::io::Error> {
     let context = Context::without_prelude();
