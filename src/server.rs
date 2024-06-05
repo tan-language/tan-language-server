@@ -8,7 +8,7 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
     DocumentSymbolParams, DocumentSymbolResponse, Location, OneOf, Position,
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
-    TextDocumentItem, TextDocumentSyncKind, TextEdit, Uri,
+    TextDocumentSyncKind, TextEdit, Uri,
 };
 use tan::{api::parse_string_all, error::Error, expr::Expr};
 use tan_formatting::pretty::Formatter;
@@ -86,11 +86,11 @@ impl Server {
 
     // #todo return a more precise result.
     pub fn send_diagnostics(&self, connection: &Connection, uri: Uri) -> anyhow::Result<()> {
-        let Some(input) = self.documents.get(uri.as_str()) else {
-            return Err(anyhow!("Unknown document").context("in send_diagnostics"));
+        let Some(parse_result) = self.parsed_documents.get(uri.as_str()) else {
+            return Err(anyhow!("invalid document").context("in send_diagnostics"));
         };
 
-        let diagnostics = compute_diagnostics(input);
+        let diagnostics = compute_diagnostics(parse_result);
 
         let pdm = PublishDiagnosticsParams {
             uri: uri.clone(),
@@ -328,8 +328,6 @@ impl Server {
                             {
                                 let document = params.text_document;
                                 self.process_document(&document.uri, &document.text);
-                                // self.documents
-                                //     .insert(document.uri.to_string(), document.text);
                                 self.send_diagnostics(&connection, document.uri)?;
                             }
                         }
@@ -341,8 +339,7 @@ impl Server {
                                 let document = params.text_document;
                                 let changes = params.content_changes;
                                 if let Some(change) = changes.first() {
-                                    self.documents
-                                        .insert(document.uri.to_string(), change.text.clone());
+                                    self.process_document(&document.uri, &change.text);
                                     self.send_diagnostics(&connection, document.uri)?;
                                 }
                             }
