@@ -10,14 +10,14 @@ use lsp_types::{
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::{api::parse_string_all, context::Context, expr::Expr};
+use tan::{api::parse_string_all, expr::Expr};
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
 use crate::util::{
-    dialect_from_document_uri, lsp_range_from_tan_range, lsp_range_top, parse_module_file,
-    send_server_status_notification, VERSION,
+    dialect_from_document_uri, lsp_range_from_tan_range, lsp_range_top, make_analysis_context,
+    parse_module_file, send_server_status_notification, VERSION,
 };
 
 // #insight
@@ -108,10 +108,8 @@ impl Server {
         // let params: InitializeParams = serde_json::from_value(params).unwrap();
         // eprintln!("{params:#?}");
 
-        // #insight cache the analysis context.
-        // #todo make a fully working context!
-        // let mut analysis_context = make_context_for_parsing().unwrap();
-        let mut analysis_context = Context::new();
+        // #insight we cache the analysis context out of the loop.
+        let mut analysis_context = make_analysis_context().unwrap();
 
         for msg in &connection.receiver {
             trace!("Got msg: {:?}.", msg);

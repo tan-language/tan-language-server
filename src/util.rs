@@ -8,7 +8,9 @@ use lsp_types::notification::Notification;
 use tan::api::eval_string;
 use tan::context::Context;
 use tan::error::Error;
+use tan::expr::Expr;
 use tan::scope::Scope;
+use tan::util::standard_names::CURRENT_MODULE_PATH;
 use tan_formatting::types::Dialect;
 
 use crossbeam::channel::SendError;
@@ -84,21 +86,20 @@ pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Rang
     lsp_types::Range { start, end }
 }
 
-// #todo probably not required.
+// #insight used to initialize current_module_path.
 // #todo find a better name.
-// pub fn make_context_for_parsing() -> Result<Context, std::io::Error> {
-//     let context = Context::without_prelude();
+// #todo extract this helper function, it's useful in multiple places.
+pub fn make_analysis_context() -> Result<Context, std::io::Error> {
+    let context = Context::new();
 
-//     // #todo prepare context out of this!
+    let current_dir = std::env::current_dir()?.display().to_string();
 
-//     let current_dir = std::env::current_dir()?.display().to_string();
+    context
+        .top_scope
+        .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
 
-//     context
-//         .top_scope
-//         .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
-
-//     Ok(context)
-// }
+    Ok(context)
+}
 
 // #todo #temp move elsewhere!
 // #todo find a better name.
