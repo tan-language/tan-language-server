@@ -5,10 +5,12 @@ use serde::{Deserialize, Serialize};
 use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification;
 
-use tan::api::eval_string;
+use tan::api::compile_string;
 use tan::context::Context;
 use tan::error::Error;
+use tan::expr::Expr;
 use tan::scope::Scope;
+use tan::util::standard_names::CURRENT_MODULE_PATH;
 use tan_formatting::types::Dialect;
 
 use crossbeam::channel::SendError;
@@ -84,21 +86,20 @@ pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Rang
     lsp_types::Range { start, end }
 }
 
-// #todo probably not required.
+// #insight used to initialize current_module_path.
 // #todo find a better name.
-// pub fn make_context_for_parsing() -> Result<Context, std::io::Error> {
-//     let context = Context::without_prelude();
+// #todo extract this helper function, it's useful in multiple places.
+pub fn make_analysis_context() -> Result<Context, std::io::Error> {
+    let context = Context::new();
 
-//     // #todo prepare context out of this!
+    let current_dir = std::env::current_dir()?.display().to_string();
 
-//     let current_dir = std::env::current_dir()?.display().to_string();
+    context
+        .top_scope
+        .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
 
-//     context
-//         .top_scope
-//         .insert(CURRENT_MODULE_PATH, Expr::string(current_dir));
-
-//     Ok(context)
-// }
+    Ok(context)
+}
 
 // #todo #temp move elsewhere!
 // #todo find a better name.
@@ -107,8 +108,30 @@ pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Rang
 pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope>, Vec<Error>> {
     // #todo implement some context nesting helpers.
     context.scope = Arc::new(Scope::new(context.scope.clone()));
+
     // #todo #IMPORTANT I think eval is _not_ really needed! maybe just compile!
-    let _ = eval_string(input, context);
+    // let _ = eval_string(input, context);
+
+    let exprs = compile_string(input, context)?;
+
+    // #insight only process top-level `let` definitions.
+    // #insight ignore problematic `use` imports.
+
+    // #todo implement a formalized method for custom evaluators like the following.
+
+    for expr in exprs {
+        if let Some(terms) = expr.as_list() {
+            if let Some(op) = terms.first() {
+                if let Some(sym) = op.as_symbol() {
+                    if sym == "let" {
+                        // #todo what to do about the error case here?
+                        let _ = tan::eval::eval_let::eval_let(op, &terms[1..], context);
+                    }
+                }
+            }
+        }
+    }
+
     Ok(context.scope.clone())
 }
 
@@ -121,10 +144,6 @@ mod tests {
     #[test]
     fn parse_module_file_usage() {
         let mut context = Context::new();
-
-        // #todo #fix (`use` fucks-up the scope!!!)
-        // #todo add unit-test for `use`
-        // #todo also function invocation seems to fuck-up the scope.
 
         let input = r#"
         (let a 1)
@@ -148,14 +167,23 @@ mod tests {
         "#;
 
         let scope = parse_module_file(input, &mut context).unwrap();
-        // dbg!(&scope);
-        // dbg!(scope.get("rng/random").unwrap().annotations());
         let bindings = scope.bindings.read().expect("not poisoned");
         let symbols: Vec<String> = bindings.keys().cloned().collect();
-        assert!(symbols.contains(&String::from("rng/random")));
+        // #insight we ignore `use` imports
+        // assert!(symbols.contains(&String::from("rng/random")));
         assert!(symbols.contains(&String::from("b")));
         assert!(symbols.contains(&String::from("zonk")));
 
-        // #todo check with function call.
+        let input = r#"
+        (let b 2)
+        (let zonk (Func [x y] (+ x y)))
+        (let z (zonk b 4))
+        (let a 1)
+        "#;
+
+        let scope = parse_module_file(input, &mut context).unwrap();
+        let bindings = scope.bindings.read().expect("not poisoned");
+        let symbols: Vec<String> = bindings.keys().cloned().collect();
+        assert!(symbols.contains(&String::from("z")));
     }
 }
