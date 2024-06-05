@@ -10,7 +10,7 @@ use lsp_types::{
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::{api::parse_string_all, expr::Expr};
+use tan::{api::parse_string_all, error::Error, expr::Expr};
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
@@ -26,6 +26,7 @@ use crate::util::{
 
 pub struct Server {
     documents: HashMap<String, String>,
+    parsed_documents: HashMap<String, Result<Vec<Expr>, Vec<Error>>>,
     // #todo also cache 'parsed/compiled' documents -> partial modules.
 }
 
@@ -35,6 +36,7 @@ impl Server {
     pub fn new() -> Self {
         Self {
             documents: HashMap::default(),
+            parsed_documents: HashMap::default(),
         }
     }
 
@@ -73,13 +75,22 @@ impl Server {
         Ok(())
     }
 
+    // #todo find a good name.
+    pub fn process_document(&mut self, uri: &Uri, text: &str) {
+        let input = text.to_string();
+        let uri = uri.to_string();
+        let exprs = parse_string_all(&input);
+        self.parsed_documents.insert(uri.clone(), exprs);
+        self.documents.insert(uri, input);
+    }
+
     // #todo return a more precise result.
     pub fn send_diagnostics(&self, connection: &Connection, uri: Uri) -> anyhow::Result<()> {
-        let Some(input) = self.documents.get(uri.as_str()) else {
-            return Err(anyhow!("Unknown document").context("in send_diagnostics"));
+        let Some(parse_result) = self.parsed_documents.get(uri.as_str()) else {
+            return Err(anyhow!("invalid document").context("in send_diagnostics"));
         };
 
-        let diagnostics = compute_diagnostics(input);
+        let diagnostics = compute_diagnostics(parse_result);
 
         let pdm = PublishDiagnosticsParams {
             uri: uri.clone(),
@@ -164,14 +175,8 @@ impl Server {
                             let (id, params) =
                                 req.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)?;
                             // #todo Flat (SymbolInformation) vs Nested (DocumentSymbol)
-                            // #todo let's go for Nested!
 
                             // #insight, actually Flat works just fine, Nested is too noisy.
-
-                            // #todo this is a dummy range.
-                            // let start = Position::new(0, 0);
-                            // let end = Position::new(u32::MAX, u32::MAX);
-                            // let dummy_range = Range::new(start, end);
 
                             // #todo for some reason, the Nested form was not working! investigate.
                             // #todo maybe we need to populate `children`?
@@ -187,36 +192,31 @@ impl Server {
                             //     children: None,
                             // };
 
-                            // #todo super hacky/experimental!
                             // #todo cache the parsing between documentSymbol, formatting, linting etc!
 
-                            let Some(document) =
-                                self.documents.get(params.text_document.uri.as_str())
+                            let Some(Ok(exprs)) =
+                                self.parsed_documents.get(params.text_document.uri.as_str())
                             else {
                                 // #todo what should be done here?
                                 trace!("!!!!! should NOT happen?");
                                 continue;
                             };
 
-                            let scope = parse_module_file(document, &mut analysis_context).unwrap();
+                            let Ok(scope) = parse_module_file(exprs, &mut analysis_context) else {
+                                // #todo what to do here?
+                                continue;
+                            };
                             let bindings = scope.bindings.read().expect("not poisoned");
 
                             let mut infos: Vec<SymbolInformation> = Vec::new();
 
-                            // #todo make sure the symbols are returned in the source order!
-                            // #todo could even sort by range, or make the scope binding preserve order.
+                            // #insight VS Code automatically sorts the documentSymbols in source/range order.
 
                             for (name, expr) in bindings.iter() {
                                 let range = if let Some(tan_range) = expr.range() {
                                     lsp_range_from_tan_range(tan_range)
                                 } else {
-                                    // #todo extract whole document range helper.
                                     // #todo is this clause really needed?
-                                    // dummy_range
-
-                                    // #todo use imports don't have range.
-                                    // #todo temporary point to top of document.
-                                    // trace!("=====>>>>>>> {:?}", expr.annotations());
                                     lsp_range_top()
                                 };
 
@@ -253,6 +253,7 @@ impl Server {
 
                             // #todo maybe it needs children array populated?
                             // let result = DocumentSymbolResponse::Nested(vec![ds]);
+
                             let result = DocumentSymbolResponse::Flat(infos);
                             let result =
                                 serde_json::to_value::<DocumentSymbolResponse>(result).unwrap();
@@ -325,8 +326,7 @@ impl Server {
                                 .extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
                             {
                                 let document = params.text_document;
-                                self.documents
-                                    .insert(document.uri.to_string(), document.text);
+                                self.process_document(&document.uri, &document.text);
                                 self.send_diagnostics(&connection, document.uri)?;
                             }
                         }
@@ -338,8 +338,7 @@ impl Server {
                                 let document = params.text_document;
                                 let changes = params.content_changes;
                                 if let Some(change) = changes.first() {
-                                    self.documents
-                                        .insert(document.uri.to_string(), change.text.clone());
+                                    self.process_document(&document.uri, &change.text);
                                     self.send_diagnostics(&connection, document.uri)?;
                                 }
                             }
