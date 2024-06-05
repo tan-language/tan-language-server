@@ -107,6 +107,7 @@ pub fn lsp_range_from_tan_range(tan_range: tan::range::Range) -> lsp_types::Rang
 pub fn parse_module_file(input: &str, context: &mut Context) -> Result<Arc<Scope>, Vec<Error>> {
     // #todo implement some context nesting helpers.
     context.scope = Arc::new(Scope::new(context.scope.clone()));
+    // #todo #IMPORTANT I think eval is _not_ really needed! maybe just compile!
     let _ = eval_string(input, context);
     Ok(context.scope.clone())
 }
