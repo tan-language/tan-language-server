@@ -10,14 +10,14 @@ use lsp_types::{
     PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, TextEdit, Uri,
 };
-use tan::{api::parse_string_all, error::Error, expr::Expr};
+use tan::{error::Error, expr::Expr};
 use tan_formatting::pretty::Formatter;
 use tan_lints::compute_diagnostics;
 use tracing::{info, trace};
 
 use crate::util::{
     dialect_from_document_uri, lsp_range_from_tan_range, lsp_range_top, make_analysis_context,
-    parse_module_file, send_server_status_notification, VERSION,
+    parse_module_file, parse_string_all, send_server_status_notification, VERSION,
 };
 
 // #insight

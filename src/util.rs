@@ -10,6 +10,8 @@ use tan::context::Context;
 use tan::error::Error;
 use tan::eval::eval;
 use tan::expr::{expr_clone, Expr};
+use tan::lexer::Lexer;
+use tan::parser::Parser;
 use tan::scope::Scope;
 use tan::util::standard_names::CURRENT_MODULE_PATH;
 use tan_formatting::types::Dialect;
@@ -26,6 +28,20 @@ pub fn dialect_from_document_uri(uri: &str) -> Dialect {
     } else {
         Dialect::Code
     }
+}
+
+// #todo Extract to util library (tan-analysis)?
+// Custom method that uses the analysis parser!
+pub fn parse_string_all(input: impl AsRef<str>) -> Result<Vec<Expr>, Vec<Error>> {
+    let input = input.as_ref();
+
+    let mut lexer = Lexer::new(input);
+    let tokens = lexer.lex()?;
+
+    let mut parser = Parser::for_analysis(&tokens);
+    let exprs = parser.parse()?;
+
+    Ok(exprs)
 }
 
 #[derive(Debug)]
@@ -156,9 +172,9 @@ pub fn parse_module_file(exprs: &[Expr], context: &mut Context) -> Result<Arc<Sc
 
 #[cfg(test)]
 mod tests {
-    use tan::{api::parse_string_all, context::Context};
+    use tan::context::Context;
 
-    use crate::util::parse_module_file;
+    use crate::util::{parse_module_file, parse_string_all};
 
     #[test]
     fn parse_module_file_usage() {
